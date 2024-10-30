@@ -157,9 +157,8 @@ export const Editor = () => {
   }, [editorView, refreshTypes])
 
   return (
-    <div className='relative h-full overflow-y-auto'>
-      <div className='absolute left-0 right-0 mx-auto w-[4px] z-10 h-full bg-secondary '>
-      </div>
+    <div className='relative h-full overflow-hidden'>
+      <div className='absolute left-0 right-0 mx-auto w-[4px] z-10 h-full bg-secondary' />
       <button
         className='absolute left-0 right-0 mx-auto w-[75px] z-10 focus:outline-none group'
         title='Run all queries'
@@ -178,12 +177,11 @@ export const Editor = () => {
           className='text-neutral-400 hover:text-neutral-100 group-focus:text-green-600 transition-colors duration-150'
           width={75}
           height={75}
-        >
-        </PlayIcon>
+        />
       </button>
 
       <div className='grid grid-cols-2 items-stretch h-full'>
-        <div className='flex flex-col h-full'>
+        <div className='flex flex-col h-full overflow-y-auto'>
           <MemoizedCodeMirror
             extensions={extensions}
             onEditorViewChange={(editorView) => setEditorView(editorView)}
@@ -192,11 +190,14 @@ export const Editor = () => {
           <QueryBuilder />
         </div>
 
-        <MemoizedCodeMirror
-          extensions={responseEditorExtensions}
-          value={responseValue}
-          selection={{ head: 0, anchor: 0 }}
-        />
+        <div className="flex flex-col h-full overflow-y-auto">
+          <MemoizedCodeMirror
+            extensions={responseEditorExtensions}
+            value={responseValue}
+            selection={{ head: 0, anchor: 0 }}
+            elementProps={{ className: 'bg-primary flex-1' }}
+          />
+        </div>
       </div>
     </div>
   )
