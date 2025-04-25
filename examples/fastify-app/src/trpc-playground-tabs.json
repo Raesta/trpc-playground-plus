@@ -1,0 +1,35 @@
+{
+  "tabs": [
+    {
+      "id": "tab-1746315141585-z16kp3bib",
+      "title": "Default tab",
+      "content": "// Exemple:\n// trpc.hello.query(\"monde\")// Exemple:\n// trpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query({ name: \"tedst\" })\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")\n\n// Exemple:\ntrpc.hello.query(\"monde\")",
+      "isActive": true
+    },
+    {
+      "id": "tab-1746315144671-i4av0mx0c",
+      "title": "Tab 2",
+      "content": "// Exemple:\n// trpc.hello.query(\"monde\")",
+      "isActive": false
+    },
+    {
+      "id": "tab-1746315146675-grtksvdtd",
+      "title": "hjgjhgjhgjh",
+      "content": "",
+      "isActive": false
+    },
+    {
+      "id": "tab-1746315147355-9jt53ht6i",
+      "title": "Tab 4",
+      "content": "// Exemple:\n// trpc.hello.query(\"monde\")",
+      "isActive": false
+    },
+    {
+      "id": "tab-1746315147917-byelt92q3",
+      "title": "Tab 5",
+      "content": "// Exemple:\n// trpc.hello.query(\"monde\")",
+      "isActive": false
+    }
+  ],
+  "createdAt": "2025-05-05T15:13:02.749Z"
+}

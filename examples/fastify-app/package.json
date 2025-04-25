@@ -1,0 +1,20 @@
+{
+  "name": "fastify-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@trpc/server": "^11.1.1",
+    "fastify": "^5.x.x",
+    "superjson": "^2.2.2",
+    "trpc-playground-plus": "workspace:*",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
