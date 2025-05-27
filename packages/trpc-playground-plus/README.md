@@ -52,9 +52,9 @@ const app = fastify();
 // Playground configuration
 await createFastifyAdapter({
   app,
-  trpcUrl: 'http://localhost:3000/api/trpc',
+  trpcEndpoint: 'http://localhost:3000/api/trpc',
   router: appRouter,
-  playgroundEndpoint: '/playground' // Optional, default: '/playground'
+  playgroundEndpoint: '/playground'
 });
 
 // Start server
