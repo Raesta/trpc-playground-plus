@@ -9,25 +9,29 @@ import trpcPlaygroundTabs from './trpc-playground-tabs.json'
 const app = fastify()
 const t = initTRPC.create()
 
-  // Créer un routeur imbriqué pour les utilisateurs
+// Create a nested router for users
 const userRouter = t.router({
   getById: t.procedure
     .input(z.string())
-    .query(({ input }) => `User with ID: ${input}`),
+    .output(z.object({ message: z.string() }))
+    .query(({ input }) => ({ message: `User with ID: ${input}` })),
 
   create: t.procedure
     .input(z.object({ name: z.string(), email: z.string() }))
-    .mutation(({ input }) => `User created: ${input.name}`)
+    .output(z.object({ message: z.string() }))
+    .mutation(({ input }) => ({ message: `User created: ${input.name}` }))
 });
 
 // Create a nested router for posts
 const postRouter = t.router({
   getById: t.procedure
     .input(z.object({ id: z.string() }))
+    .output(z.object({ message: z.string() }))
     .query(({ input }) => ({ message: `Post with ID: ${input.id}` })),
 
   create: t.procedure
     .input(z.object({ title: z.string(), content: z.string() }))
+    .output(z.object({ message: z.string() }))
     .mutation(({ input }) => ({ message: `Post created: ${input.title}` }))
 });
 
@@ -35,10 +39,12 @@ const postRouter = t.router({
 const appRouter = t.router({
   hello: t.procedure
     .input(z.object({ name: z.string() }))
+    .output(z.object({ message: z.string() }))
     .query(({ input }) => ({ message: `Hello, ${input.name}!` })),
 
   goodbye: t.procedure
     .input(z.object({ name: z.string() }))
+    .output(z.object({ message: z.string() }))
     .mutation(({ input }) => ({ message: `Goodbye, ${input.name}!` })),
 
   user: userRouter,

@@ -129,7 +129,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
       transformer,
       endpoints: Object.keys(router._def.procedures),
       schema: routerStructure,
-      defaultTabs: defaultData?.tabs || [{ id: 'example-tab-1', title: 'Example 2', content: 'trpc.hello.query({ name: \'monde test\' })', isActive: true }],
+      defaultTabs: defaultData?.tabs || [{ id: 'example-tab-1', title: 'Example 1', content: 'trpc.hello.query({ name: \'monde test\' })', isActive: true }],
       defaultHeaders: defaultData?.headers || []
     });
   });
