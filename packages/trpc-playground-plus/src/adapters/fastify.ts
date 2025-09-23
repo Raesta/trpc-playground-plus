@@ -94,6 +94,14 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   playgroundEndpoint?: string;
   defaultData?: ExportData;
 }) {
+  if (!app || typeof app !== 'object') {
+    throw new Error('Invalid app parameter: app must be a FastifyInstance');
+  }
+
+  if (typeof app.register !== 'function') {
+    throw new Error('Invalid app parameter: app.register is not a function. Make sure you are passing a valid FastifyInstance');
+  }
+
   const validatedData = ExportDataSchema.safeParse(defaultData);
 
   if (!validatedData.success) {
@@ -102,11 +110,16 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
     throw new Error('Invalid default data format');
   }
 
-  await app.register(fastifyStatic, {
-    root: distAppPath,
-    prefix: playgroundEndpoint,
-    decorateReply: false
-  });
+  try {
+    await app.register(fastifyStatic, {
+      root: distAppPath,
+      prefix: playgroundEndpoint,
+      decorateReply: false
+    });
+  } catch (error) {
+    console.error('Error registering fastify-static plugin:', error);
+    throw new Error(`Failed to register fastify-static plugin: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   app.get(playgroundEndpoint, (_, reply) => {
     const htmlPath = path.join(distAppPath, 'index.html');
