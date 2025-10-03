@@ -45,9 +45,7 @@ export function createDynamicTRPCClient({ trpcUrl, transformer, headers }: Creat
                   return await fetch(finalUrl, requestOptions);
                 } else {
                   // For POST requests, serialize with superJSON in body
-                  const serializedInput = superJSON.stringify(input);
-
-                  requestOptions.body = serializedInput;
+                  requestOptions.body = superJSON.stringify(input);
 
                   return await fetch(url, requestOptions);
                 }
@@ -57,34 +55,10 @@ export function createDynamicTRPCClient({ trpcUrl, transformer, headers }: Creat
               const data = await response.json();
 
               if (data.error) {
-                try {
-                  console.log("data error", data)
-                  console.log("here 1")
-                  const parsedMessage = JSON.parse(data.error.json);
-                  return {
-                    ...data.error,
-                    json: {
-                      ...data.error.json,
-                      message: parsedMessage,
-                    }
-                  }
-                } catch (error) {
-                  console.log("error", JSON.stringify(error, null, 2))
-                  console.log("here 3")
-                  // If parsing fails, return the original error
-                  return data.error;
-                }
+                return data.error.json
               }
 
-              // If data.result is already an object, return it directly
-              // Otherwise, try to deserialize it with superJSON
-              if (data.result && typeof data.result === 'object' && data.result !== null) {
-                return data.result.data;
-              } else if (data.result) {
-                return superJSON.parse(data.result.data);
-              }
-
-              return null;
+              return data.result.data.json;
             };
           }
 
