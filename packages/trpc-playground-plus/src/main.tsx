@@ -99,7 +99,6 @@ const Playground = () => {
         })();
       `);
       const result = await executeFunction(trpcClient);
-
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);

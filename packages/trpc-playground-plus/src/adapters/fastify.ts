@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { type RouterSchema } from '../types';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));const distAppPath = path.resolve(__dirname, './app');
 
@@ -35,6 +36,29 @@ function hasDef(fn: unknown): fn is ProcedureWithDef {
   return typeof fn === 'function' && '_def' in fn;
 }
 
+function extractProcedureSchemas(def: any) {
+  try {
+    // In tRPC, the input schema can be in def.inputs (array) or def.input (single)
+    const inputSchema = def.inputs?.[0] ?? def.input;
+    const outputSchema = def.output;
+
+    return {
+      inputSchema: inputSchema ? zodToJsonSchema(inputSchema) : null,
+      outputSchema: outputSchema ? zodToJsonSchema(outputSchema) : null,
+      inputZodSchema: inputSchema || null,
+      outputZodSchema: outputSchema || null
+    };
+  } catch (error) {
+    console.warn('Error extracting schemas:', error);
+    return {
+      inputSchema: null,
+      outputSchema: null,
+      inputZodSchema: null,
+      outputZodSchema: null
+    };
+  }
+}
+
 function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
   const structure: RouterSchema = {};
 
@@ -48,7 +72,9 @@ function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
         : def.type === 'mutation'
         ? 'mutation'
         : 'router';
-      structure[key] = { type };
+
+      const schemas = extractProcedureSchemas(def);
+      structure[key] = { type, ...schemas };
     } else if (typeof value === 'object' && value !== null) {
       const hasProcedure = Object.values(value).some(
         (v) => hasDef(v) && v._def
@@ -63,8 +89,10 @@ function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
               : def.type === 'mutation'
               ? 'mutation'
               : 'router';
+
+            const schemas = extractProcedureSchemas(def);
             if (!structure[key]) structure[key] = { type: 'router', children: {} };
-            (structure[key] as { type: 'router'; children: RouterSchema }).children[subKey] = { type };
+            (structure[key] as { type: 'router'; children: RouterSchema }).children[subKey] = { type, ...schemas };
           }
         });
       } else {
@@ -77,6 +105,25 @@ function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
   });
 
   return structure;
+}
+
+function stripZodSchemasForClient(schema: RouterSchema): RouterSchema {
+  const stripped: RouterSchema = {};
+
+  for (const [key, value] of Object.entries(schema)) {
+    if (value.type === 'router') {
+      stripped[key] = {
+        type: 'router',
+        children: value.children ? stripZodSchemasForClient(value.children) : undefined
+      };
+    } else {
+      // Keep only inputSchema and outputSchema (JSON), not the Zod schemas
+      const { inputZodSchema, outputZodSchema, ...rest } = value;
+      stripped[key] = rest;
+    }
+  }
+
+  return stripped;
 }
 
 export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
@@ -141,7 +188,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
       trpcEndpoint,
       transformer,
       endpoints: Object.keys(router._def.procedures),
-      schema: routerStructure,
+      schema: stripZodSchemasForClient(routerStructure),
       defaultTabs: defaultData?.tabs || [{ id: 'example-tab-1', title: 'Example 1', content: 'trpc.hello.query({ name: \'monde test\' })', isActive: true }],
       defaultHeaders: defaultData?.headers || []
     });

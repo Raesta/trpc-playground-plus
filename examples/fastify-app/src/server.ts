@@ -3,7 +3,6 @@ import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { initTRPC } from '@trpc/server'
 import { z } from 'zod'
 import { createFastifyAdapter } from 'trpc-playground-plus'
-import superJSON from 'superjson'
 import trpcPlaygroundTabs from './trpc-playground-tabs.json'
 
 const app = fastify()
@@ -47,6 +46,39 @@ const appRouter = t.router({
     .output(z.object({ message: z.string() }))
     .mutation(({ input }) => ({ message: `Goodbye, ${input.name}!` })),
 
+  test: t.procedure
+    .input(z.string())
+    .output(z.string())
+    .query(({ input }) => (input)),
+
+  testSubRouter: t.router({
+    test: t.procedure
+      .input(z.object({ name: z.string() }))
+      .output(z.object({ message: z.string() }))
+      .query(({ input }) => ({ message: `Hello, ${input.name}!` })),
+  }),
+
+  testSubObject: t.procedure
+    .input(z.object({
+      name: z.string(),
+      obj: z.object({
+        text: z.string()
+      }),
+    }))
+    .output(z.object({}))
+    .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
+
+  testSubArray: t.procedure
+    .input(
+      z.object({
+      name: z.string(),
+      obj: z.object({
+        text: z.string()
+      }),
+    }))
+    .output(z.object({}))
+    .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
+
   user: userRouter,
   post: postRouter
 });
@@ -54,16 +86,13 @@ const appRouter = t.router({
 app.register(fastifyTRPCPlugin, {
   prefix: '/trpc',
   trpcOptions: {
-    transformer: superJSON,
     router: appRouter,
-    createContext: () => ({})
   }
 })
 
 const playground = await createFastifyAdapter({
   app,
   trpcEndpoint: '/trpc',
-  transformer: 'superjson',
   router: appRouter,
   playgroundEndpoint: '/playground',
   defaultData: trpcPlaygroundTabs

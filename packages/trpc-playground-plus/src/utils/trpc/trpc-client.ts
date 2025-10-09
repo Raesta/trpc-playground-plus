@@ -21,7 +21,6 @@ export function createDynamicTRPCClient({ trpcUrl, transformer, headers }: Creat
             return async function(input: any) {
               const method = prop === 'query' ? 'GET' : 'POST';
               const url = `${trpcUrl}/${currentPath.slice(0, -1).join('.')}`;
-
               const requestOptions: RequestInit = {
                 method,
                 headers: {
@@ -33,7 +32,8 @@ export function createDynamicTRPCClient({ trpcUrl, transformer, headers }: Creat
               const makeRequest = async () => {
                 if (method === 'GET') {
                   // For GET requests, serialize with superJSON and pass as query parameter
-                  const serializedInput = superJSON.stringify(input);
+                  const serialized = superJSON.serialize(input);
+                  const serializedInput = JSON.stringify(serialized);
                   const params = new URLSearchParams();
 
                   if (input !== undefined) {
@@ -45,7 +45,8 @@ export function createDynamicTRPCClient({ trpcUrl, transformer, headers }: Creat
                   return await fetch(finalUrl, requestOptions);
                 } else {
                   // For POST requests, serialize with superJSON in body
-                  requestOptions.body = superJSON.stringify(input);
+                  const serialized = superJSON.serialize(input);
+                  requestOptions.body = JSON.stringify(serialized);
 
                   return await fetch(url, requestOptions);
                 }

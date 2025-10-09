@@ -1,4 +1,3 @@
-// Types personnalisés pour l'adaptateur
 export interface RouterProcedure {
   type: 'query' | 'mutation' | 'subscription';
 }
@@ -20,6 +19,10 @@ export interface RouterSchema {
     type: 'query' | 'mutation';
     inputs?: Record<string, string>;
     outputs?: Record<string, string>;
+    inputSchema?: any;
+    outputSchema?: any;
+    inputZodSchema?: any;
+    outputZodSchema?: any;
   }
 }
 

@@ -5,7 +5,10 @@ import { autocompletion, CompletionContext, CompletionResult } from '@codemirror
 import { RouterSchema } from '../types';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { javascript } from "@codemirror/lang-javascript"
+import { javascript } from "@codemirror/lang-javascript";
+import { linter, Diagnostic } from '@codemirror/lint';
+import { parseCodeForTrpcCalls } from '../utils/code-parser';
+import { validateCodeWithCache } from '../utils/zod-validator';
 
 interface CodeEditorProps {
   value: string;
@@ -31,14 +34,101 @@ const styles: Record<string, React.CSSProperties> = {
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest }) => {
+
+  const createTrpcLinter = React.useCallback((schema: RouterSchema) => {
+    return linter((view) => {
+      const code = view.state.doc.toString();
+      const parseResult = parseCodeForTrpcCalls(code);
+      const diagnostics: Diagnostic[] = [];
+
+      // Add parsing errors
+      for (const parseError of parseResult.errors) {
+        diagnostics.push({
+          from: parseError.position.start,
+          to: parseError.position.end,
+          severity: 'error',
+          message: parseError.message,
+        });
+      }
+
+      // Validate tRPC calls
+      if (parseResult.calls.length > 0) {
+        const validationResult = validateCodeWithCache(code, parseResult.calls, schema);
+
+        // Add validation errors
+        for (const error of validationResult.errors) {
+          diagnostics.push({
+            from: error.position.start,
+            to: error.position.end,
+            severity: 'error',
+            message: error.message,
+            source: 'tRPC Type Check',
+          });
+        }
+
+        // Add warnings
+        for (const warning of validationResult.warnings) {
+          diagnostics.push({
+            from: warning.position.start,
+            to: warning.position.end,
+            severity: 'warning',
+            message: warning.message,
+            source: 'tRPC Type Check',
+          });
+        }
+      }
+
+      return diagnostics;
+    });
+  }, []);
+
+  const trpcLinterExtension = React.useMemo(() => createTrpcLinter(schema), [schema, createTrpcLinter]);
+  const formatSchemaForInfo = (schema: any): string => {
+    if (!schema) return '';
+
+    try {
+      // If it's a JSON schema, extract type information
+      if (schema.type === 'object' && schema.properties) {
+        const props = Object.entries(schema.properties)
+          .map(([key, prop]: [string, any]) => {
+            const type = prop.type || 'unknown';
+            const required = schema.required?.includes(key) ? '' : '?';
+            return `${key}${required}: ${type}`;
+          })
+          .join(', ');
+        return `{ ${props} }`;
+      } else if (schema.type) {
+        return schema.type;
+      }
+    } catch (error) {
+      console.warn('Error formatting schema:', error);
+    }
+
+    return 'any';
+  };
+
   const getCompletionsFromPath = (path: string[]): CompletionResult['options'] => {
     if (path.length === 0 || path[0] === '') {
-      return Object.entries(schema).map(([key, def]) => ({
-        label: key,
-        type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
-        apply: `${key}.`,
-        info: `tRPC ${def.type}: ${key}`
-      }));
+      return Object.entries(schema).map(([key, def]) => {
+        let info = `tRPC ${def.type}: ${key}`;
+
+        if (def.type !== 'router' && 'inputSchema' in def && def.inputSchema) {
+          const inputType = formatSchemaForInfo(def.inputSchema);
+          info += `\nInput: ${inputType}`;
+        }
+
+        if (def.type !== 'router' && 'outputSchema' in def && def.outputSchema) {
+          const outputType = formatSchemaForInfo(def.outputSchema);
+          info += `\nOutput: ${outputType}`;
+        }
+
+        return {
+          label: key,
+          type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
+          apply: `${key}.`,
+          info
+        };
+      });
     }
 
     let currentLevel = schema;
@@ -55,20 +145,46 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     const routerDef = currentLevel[lastSegment];
 
     if (routerDef && routerDef.type === 'router' && routerDef.children) {
-      return Object.entries(routerDef.children).map(([key, def]) => ({
-        label: key,
-        type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
-        apply: ['query', 'mutation'].includes(def.type) ? `${key}.${def.type === 'mutation' ? 'mutate' : 'query'}()` : `${key}.`,
-        info: `tRPC ${def.type}: ${key}`
-      }));
+      return Object.entries(routerDef.children).map(([key, def]) => {
+        let info = `tRPC ${def.type}: ${key}`;
+
+        if (def.type !== 'router' && 'inputSchema' in def && def.inputSchema) {
+          const inputType = formatSchemaForInfo(def.inputSchema);
+          info += `\nInput: ${inputType}`;
+        }
+
+        if (def.type !== 'router' && 'outputSchema' in def && def.outputSchema) {
+          const outputType = formatSchemaForInfo(def.outputSchema);
+          info += `\nOutput: ${outputType}`;
+        }
+
+        return {
+          label: key,
+          type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
+          apply: ['query', 'mutation'].includes(def.type) ? `${key}.${def.type === 'mutation' ? 'mutate' : 'query'}()` : `${key}.`,
+          info
+        };
+      });
     } else if (routerDef) {
       const type = routerDef.type === 'mutation' ? 'mutate' : 'query';
+      let info = `Execute this procedure as ${type}`;
+
+      if (routerDef.type !== 'router' && 'inputSchema' in routerDef && routerDef.inputSchema) {
+        const inputType = formatSchemaForInfo(routerDef.inputSchema);
+        info += `\nInput: ${inputType}`;
+      }
+
+      if (routerDef.type !== 'router' && 'outputSchema' in routerDef && routerDef.outputSchema) {
+        const outputType = formatSchemaForInfo(routerDef.outputSchema);
+        info += `\nOutput: ${outputType}`;
+      }
+
       return [
         {
           label: type,
           type: 'function',
           apply: `${type}()`,
-          info: `Exécuter cette procédure comme ${type}`
+          info
         }
       ];
     }
@@ -99,7 +215,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       return {
         from: word.from,
         options: [
-          { label: 'trpc', type: 'text', apply: 'trpc.', info: 'Accéder aux propriétés tRPC' }
+          { label: 'trpc', type: 'text', apply: 'trpc.', info: 'Access tRPC properties' }
         ]
       };
     }
@@ -170,7 +286,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             button.style.cursor = "pointer";
             button.style.marginRight = "4px";
             button.style.padding = "0px";
-            button.title = "Exécuter cet appel";
+            button.title = "Execute this call";
 
             button.onclick = () => {
               if (onPlayRequest) {
@@ -198,6 +314,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         extensions={[
           javascript({ typescript: true }),
           trpcAutocompleteExtension,
+          trpcLinterExtension,
           playButtonExtension
         ]}
         onChange={onChange}
