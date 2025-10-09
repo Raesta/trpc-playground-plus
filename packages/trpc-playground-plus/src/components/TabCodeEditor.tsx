@@ -103,6 +103,19 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
     ));
   };
 
+  const handleTabReorder = (fromId: string, toId: string) => {
+    const fromIndex = tabs.findIndex(tab => tab.id === fromId);
+    const toIndex = tabs.findIndex(tab => tab.id === toId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const newTabs = [...tabs];
+    const [movedTab] = newTabs.splice(fromIndex, 1);
+    newTabs.splice(toIndex, 0, movedTab);
+
+    onTabsChange(newTabs);
+  };
+
   const handleCodeChange = (newValue: string) => {
     onTabsChange(tabs.map(tab =>
       tab.isActive ? { ...tab, content: newValue } : tab
@@ -119,6 +132,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         onTabClose={handleTabClose}
         onTabAdd={handleTabAdd}
         onTabRename={handleTabRename}
+        onTabReorder={handleTabReorder}
       />
 
       <div style={styles.viewers}>
