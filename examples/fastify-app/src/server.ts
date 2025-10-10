@@ -37,7 +37,7 @@ const postRouter = t.router({
 // Create the main router
 const appRouter = t.router({
   hello: t.procedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ name: z.string(), text: z.string().optional() }))
     .output(z.object({ message: z.string() }))
     .query(({ input }) => ({ message: `Hello, ${input.name}!` })),
 

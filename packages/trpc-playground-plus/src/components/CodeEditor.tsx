@@ -114,18 +114,34 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
         if (def.type !== 'router' && 'inputSchema' in def && def.inputSchema) {
           const inputType = formatSchemaForInfo(def.inputSchema);
-          info += `\nInput: ${inputType}`;
+          info += `\n\nInput: ${inputType}`;
         }
 
         if (def.type !== 'router' && 'outputSchema' in def && def.outputSchema) {
           const outputType = formatSchemaForInfo(def.outputSchema);
-          info += `\nOutput: ${outputType}`;
+          info += `\n\nOutput: ${outputType}`;
+        }
+
+        // Determine the apply based on the type
+        let apply: string | ((view: any, completion: any, from: number, to: number) => void);
+
+        if (['query', 'mutation'].includes(def.type)) {
+          const methodName = def.type === 'mutation' ? 'mutate' : 'query';
+          apply = (view, _completion, from, to) => {
+            const text = `${key}.${methodName}()`;
+            view.dispatch({
+              changes: { from, to, insert: text },
+              selection: { anchor: from + text.length - 1 } // Position before the )
+            });
+          };
+        } else {
+          apply = `${key}.`;
         }
 
         return {
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
-          apply: `${key}.`,
+          apply,
           info
         };
       });
@@ -158,10 +174,25 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           info += `\nOutput: ${outputType}`;
         }
 
+        // Determine the apply based on the type
+        let apply: string | ((view: any, completion: any, from: number, to: number) => void);
+        if (['query', 'mutation'].includes(def.type)) {
+          const methodName = def.type === 'mutation' ? 'mutate' : 'query';
+          apply = (view, _completion, from, to) => {
+            const text = `${key}.${methodName}()`;
+            view.dispatch({
+              changes: { from, to, insert: text },
+              selection: { anchor: from + text.length - 1 } // Position before the )
+            });
+          };
+        } else {
+          apply = `${key}.`;
+        }
+
         return {
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
-          apply: ['query', 'mutation'].includes(def.type) ? `${key}.${def.type === 'mutation' ? 'mutate' : 'query'}()` : `${key}.`,
+          apply,
           info
         };
       });
@@ -183,7 +214,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         {
           label: type,
           type: 'function',
-          apply: `${type}()`,
+          apply: (view, completion, from, to) => {
+            const text = `${type}()`;
+            view.dispatch({
+              changes: { from, to, insert: text },
+              selection: { anchor: from + text.length - 1 } // Position before the )
+            });
+          },
           info
         }
       ];
@@ -194,9 +231,165 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
   const createTRPCCompletions = (context: CompletionContext): CompletionResult | null => {
     const word = context.matchBefore(/\w*/);
+    const text = context.state.doc.sliceString(0, context.pos);
+
+    // Find the LAST match of query( or mutate( before the cursor
+    const regex = /trpc((?:\.\w+)+)\.(query|mutate)\(/g;
+    let procedureMatch;
+    let lastMatch = null;
+
+    while ((procedureMatch = regex.exec(text)) !== null) {
+      lastMatch = procedureMatch;
+    }
+
+    if (lastMatch) {
+      const procedureStart = lastMatch.index! + lastMatch[0].length;
+      const afterProcedure = text.substring(procedureStart);
+
+      // Count parentheses taking into account new Date() and other functions
+      let parenCount = 1; // We start after the ( of query( or mutate(
+      let inString = false;
+      let stringChar = '';
+
+      for (let i = 0; i < afterProcedure.length; i++) {
+        const char = afterProcedure[i];
+
+        // Handle character strings
+        if ((char === '"' || char === "'") && (i === 0 || afterProcedure[i - 1] !== '\\')) {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (inString) continue;
+
+        if (char === '(') parenCount++;
+        else if (char === ')') {
+          parenCount--;
+          if (parenCount === 0) break; // query/mutate parentheses closed
+        }
+      }
+
+      // If we are still within the query/mutate parentheses
+      if (parenCount > 0) {
+        const pathStr = lastMatch[1];
+        const path = pathStr.substring(1).split('.');
+
+        // Get the inputSchema of the procedure
+        let currentLevel = schema;
+        for (let i = 0; i < path.length - 1; i++) {
+          const segment = path[i];
+          if (currentLevel[segment]?.type === 'router' && currentLevel[segment].children) {
+            currentLevel = currentLevel[segment].children!;
+          } else {
+            break; // Exit if we don't find the segment
+          }
+        }
+
+        const lastSegment = path[path.length - 1];
+        const procedureDef = currentLevel[lastSegment];
+
+        if (procedureDef && procedureDef.type !== 'router' && 'inputSchema' in procedureDef && procedureDef.inputSchema) {
+          const inputSchema = procedureDef.inputSchema;
+
+          // If the schema is an object, suggest the properties
+          if (inputSchema.type === 'object' && inputSchema.properties) {
+            const hasOpenBrace = afterProcedure.includes('{');
+
+            // Use word if available, otherwise use the current position
+            const from = word ? word.from : context.pos;
+
+            if (!hasOpenBrace) {
+              // Suggest adding {} with the cursor between the braces
+              return {
+                from,
+                options: [
+                  {
+                    label: '{}',
+                    type: 'text',
+                    apply: (view, _completion, from, to) => {
+                      const text = '{}';
+                      view.dispatch({
+                        changes: { from, to, insert: text },
+                        selection: { anchor: from + 1 } // Position between the braces
+                      });
+                    },
+                    info: 'Add argument object'
+                  }
+                ]
+              };
+            } else {
+              // Extract properties already present in the object
+              const usedKeys = new Set<string>();
+              const propertyRegex = /(\w+)\s*:/g;
+              let propMatch;
+
+              while ((propMatch = propertyRegex.exec(afterProcedure)) !== null) {
+                usedKeys.add(propMatch[1]);
+              }
+
+              // Detect if we need to add a comma before the new property
+              const needsComma = (() => {
+                // Look for non-whitespace text before the cursor (in afterProcedure)
+                const beforeCursor = afterProcedure.trimEnd();
+                if (beforeCursor.length === 0) return false;
+
+                const lastChar = beforeCursor[beforeCursor.length - 1];
+                // If the last character is not a comma, { or [, we need a comma
+                return lastChar !== ',' && lastChar !== '{' && lastChar !== '[';
+              })();
+
+              // Suggest only properties not yet used
+              const required = inputSchema.required || [];
+              const options = Object.entries(inputSchema.properties)
+                .filter(([key]) => !usedKeys.has(key)) // Filter already used keys
+                .map(([key, propSchema]: [string, any]) => {
+                  const isRequired = required.includes(key);
+                  const type = propSchema.type || 'unknown';
+
+                  let info = `${key}: ${type}`;
+                  if (isRequired) info += ' (required)';
+                  else info += ' (optional)';
+                  if (propSchema.description) info += `\n${propSchema.description}`;
+
+                  // Build the value to apply
+                  let apply = key;
+                  if (type === 'object') apply = `${key}: {}`;
+                  else if (type === 'array') apply = `${key}: []`;
+                  else if (type === 'string') apply = `${key}: ""`;
+                  else if (type === 'number' || type === 'integer') apply = `${key}: 0`;
+                  else if (type === 'boolean') apply = `${key}: false`;
+                  else apply = `${key}: `;
+
+                  // Add a comma at the beginning if necessary
+                  if (needsComma) {
+                    apply = ', ' + apply;
+                  }
+
+                  return {
+                    label: key,
+                    type: isRequired ? 'property' : 'variable',
+                    apply,
+                    info
+                  };
+                });
+
+              return {
+                from,
+                options
+              };
+            }
+          }
+        }
+      }
+    }
+
     if (!word || (word.from === word.to && !context.explicit)) return null;
 
-    const text = context.state.doc.sliceString(0, context.pos);
     const trpcPathMatch = text.match(/trpc((?:\.\w+)*)?\.?$/);
 
     if (trpcPathMatch) {
