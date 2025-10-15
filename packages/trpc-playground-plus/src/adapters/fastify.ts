@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { type RouterSchema } from '../types';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));const distAppPath = path.resolve(__dirname, './app');
 
@@ -14,7 +13,7 @@ const TabSchema = z.object({
   id: z.string(),
   title: z.string(),
   content: z.string(),
-  isActive: z.boolean().optional().default(false),
+  isActive: z.boolean().default(false),
 });
 
 const HeaderSchema = z.object({
@@ -43,8 +42,8 @@ function extractProcedureSchemas(def: any) {
     const outputSchema = def.output;
 
     return {
-      inputSchema: inputSchema ? zodToJsonSchema(inputSchema) : null,
-      outputSchema: outputSchema ? zodToJsonSchema(outputSchema) : null,
+      inputSchema: inputSchema ? z.toJSONSchema(inputSchema) : null,
+      outputSchema: outputSchema ? z.toJSONSchema(outputSchema) : null,
       inputZodSchema: inputSchema || null,
       outputZodSchema: outputSchema || null
     };
@@ -152,7 +151,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   const validatedData = ExportDataSchema.safeParse(defaultData);
 
   if (!validatedData.success) {
-    console.error('Invalid default data format', validatedData.error.flatten());
+    console.error('Invalid default data format', validatedData.error.issues);
 
     throw new Error('Invalid default data format');
   }

@@ -108,7 +108,7 @@ await createFastifyAdapter({
 
 ## 🔧 Compatibility
 
-Compatible with tRPC v11+.
+Compatible with tRPC v11+ and zod 4.
 
 ## ❓ Why this project?
 
