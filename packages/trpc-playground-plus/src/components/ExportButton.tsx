@@ -22,7 +22,7 @@ const styles: Record<string, React.CSSProperties> = {
 }
 
 export const ExportButton = ({ tabs, headers }: ExportButtonProps) => {
-  const exportTabs = () => {
+  const exportStructure = () => {
     const exportData = {
       tabs,
       headers,
@@ -44,7 +44,7 @@ export const ExportButton = ({ tabs, headers }: ExportButtonProps) => {
 
   return (
     <button
-      onClick={exportTabs}
+      onClick={exportStructure}
       style={styles.button}
       onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'}
       onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}

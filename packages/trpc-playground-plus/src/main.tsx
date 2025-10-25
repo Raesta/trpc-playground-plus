@@ -105,7 +105,7 @@ const Playground = () => {
     }
   };
 
-  const importTabs = () => {
+  const importStructure = () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'application/json';
@@ -134,6 +134,12 @@ const Playground = () => {
 
           if (importedTabs.length > 0) {
             setTabs(importedTabs);
+            localStorage.setItem('trpc-playground-tabs', JSON.stringify(importedTabs));
+          }
+
+          if (importedData.headers.length > 0) {
+            setHeaders(importedData.headers);
+            localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
           }
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
@@ -155,7 +161,7 @@ const Playground = () => {
           <div style={{ display: 'flex', gap: '8px' }}>
             <ExportButton tabs={tabs} headers={headers} />
             <button
-              onClick={importTabs}
+              onClick={importStructure}
               style={{
                 backgroundColor: '#1a1a1a',
                 color: 'white',
