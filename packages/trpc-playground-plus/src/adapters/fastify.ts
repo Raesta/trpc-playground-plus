@@ -42,8 +42,8 @@ function extractProcedureSchemas(def: any) {
     const outputSchema = def.output;
 
     return {
-      inputSchema: inputSchema ? z.toJSONSchema(inputSchema) : null,
-      outputSchema: outputSchema ? z.toJSONSchema(outputSchema) : null,
+      inputSchema: inputSchema ? z.toJSONSchema(inputSchema, { unrepresentable: 'any' }) : null,
+      outputSchema: outputSchema ? z.toJSONSchema(outputSchema, { unrepresentable: 'any' }) : null,
       inputZodSchema: inputSchema || null,
       outputZodSchema: outputSchema || null
     };

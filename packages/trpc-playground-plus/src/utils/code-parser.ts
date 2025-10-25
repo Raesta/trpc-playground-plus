@@ -31,14 +31,10 @@ function parseArguments(argsString: string): any {
         .replace(/'/g, '"');          // replace single quotes with double quotes
 
       try {
-        const parsed = JSON.parse(jsonString);
-
-        return parsed;
+        return JSON.parse(jsonString);
       } catch {
         // If JSON.parse fails, parse manually to extract the structure
-        const result = parseObjectLiteral(argsString.trim());
-
-        return result;
+        return parseObjectLiteral(argsString.trim());
       }
     }
 
