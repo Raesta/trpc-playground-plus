@@ -1,7 +1,7 @@
 import React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
-import { autocompletion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
+import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
 import { RouterSchema } from '../types';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -423,6 +423,20 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     maxRenderedOptions: 100,
   });
 
+  const dotTriggerExtension = EditorView.updateListener.of((update) => {
+    if (!update.docChanged) return;
+    for (const tr of update.transactions) {
+      let hasDot = false;
+      tr.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
+        if (inserted.toString().endsWith('.')) hasDot = true;
+      });
+      if (hasDot) {
+        setTimeout(() => startCompletion(update.view), 0);
+        return;
+      }
+    }
+  });
+
   const findTrpcCalls = (text: string): { start: number, end: number, code: string }[] => {
     const calls: { start: number, end: number, code: string }[] = [];
     const regex = /trpc\.\w+(?:\.\w+)*\.(query|mutate)\(/g;
@@ -507,6 +521,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         extensions={[
           javascript({ typescript: true }),
           trpcAutocompleteExtension,
+          dotTriggerExtension,
           trpcLinterExtension,
           playButtonExtension
         ]}
