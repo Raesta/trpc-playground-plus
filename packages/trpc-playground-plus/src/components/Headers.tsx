@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import Checkbox from "./ui/Checkbox";
 import Input from "./ui/Input";
+import { theme as t } from "../theme";
 
 interface HeadersProps {
   open: boolean;
@@ -9,6 +11,26 @@ interface HeadersProps {
 }
 
 const Headers = ({ open, setOpen, headers, setHeaders }: HeadersProps) => {
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      setClosing(false);
+    } else if (mounted) {
+      setClosing(true);
+    }
+  }, [open]);
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(() => {
+      setMounted(false);
+      setClosing(false);
+      setOpen(false);
+    }, 250);
+  };
   const addHeader = () => {
     setHeaders([...headers, {key: '', value: '', enabled: true}]);
   };
@@ -31,19 +53,19 @@ const Headers = ({ open, setOpen, headers, setHeaders }: HeadersProps) => {
 
   return (
     <>
-      {open && (
+      {mounted && (
         <>
           <div
-            onClick={() => setOpen(false)}
+            onClick={handleClose}
             style={{
               position: 'fixed',
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backgroundColor: t.colors.bg.overlay,
               zIndex: 9,
-              animation: 'fadeIn 0.2s forwards'
+              animation: closing ? 'fadeOut 0.25s forwards' : 'fadeIn 0.2s forwards',
             }}
           />
           <div
@@ -52,16 +74,35 @@ const Headers = ({ open, setOpen, headers, setHeaders }: HeadersProps) => {
               right: 0,
               top: 0,
               height: '100%',
-              backgroundColor: '#1a1a1a',
-              borderLeft: '1px solid #333',
+              backgroundColor: t.colors.bg.primary,
+              borderLeft: `1px solid ${t.colors.border.primary}`,
               padding: '10px',
               boxSizing: 'border-box',
               overflow: 'auto',
               zIndex: 10,
-              animation: 'slideIn 0.3s forwards'
+              animation: closing ? 'slideOut 0.25s forwards' : 'slideIn 0.3s forwards',
             }}
           >
-            <h3 style={{ color: 'white', marginTop: 0 }}>Headers</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ color: t.colors.text.primary, margin: 0 }}>Headers</h3>
+              <button
+                onClick={handleClose}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: t.colors.text.secondary,
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  lineHeight: 1,
+                  transition: `color ${t.transition.fast}`,
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = t.colors.text.primary}
+                onMouseOut={(e) => e.currentTarget.style.color = t.colors.text.secondary}
+              >
+                ×
+              </button>
+            </div>
 
             {headers.map((header, index) => (
               <div key={index} style={{ display: 'flex', marginBottom: '8px', gap: '5px' }}>
@@ -83,13 +124,16 @@ const Headers = ({ open, setOpen, headers, setHeaders }: HeadersProps) => {
                 <button
                   onClick={() => removeHeader(index)}
                   style={{
-                    backgroundColor: '#555',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '3px',
+                    backgroundColor: t.colors.bg.hover,
+                    color: t.colors.text.primary,
+                    border: `1px solid ${t.colors.border.primary}`,
+                    borderRadius: t.radius.sm,
                     cursor: 'pointer',
-                    width: '25px'
+                    width: '30px',
+                    transition: `background-color ${t.transition.fast}`,
                   }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.accent.danger}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
                 >
                   ×
                 </button>
@@ -99,15 +143,18 @@ const Headers = ({ open, setOpen, headers, setHeaders }: HeadersProps) => {
             <button
               onClick={addHeader}
               style={{
-                backgroundColor: '#333',
-                color: 'white',
-                border: 'none',
+                backgroundColor: t.colors.bg.hover,
+                color: t.colors.text.primary,
+                border: `1px solid ${t.colors.border.primary}`,
                 padding: '8px 16px',
-                borderRadius: '4px',
+                borderRadius: t.radius.md,
                 marginTop: '10px',
                 cursor: 'pointer',
-                width: '100%'
+                width: '100%',
+                transition: `background-color ${t.transition.normal}`,
               }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.active}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
             >
               + Add header
             </button>

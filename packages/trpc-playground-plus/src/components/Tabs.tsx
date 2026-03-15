@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { theme as t } from '../theme';
 
 interface Tab {
   id: string;
@@ -24,14 +25,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tab: {
     padding: '6px 12px',
-    color: 'white',
+    color: t.colors.text.primary,
     cursor: 'pointer',
-    border: '1px solid #333',
-    borderRadius: '4px',
+    border: `1px solid ${t.colors.border.primary}`,
+    borderRadius: t.radius.md,
     display: 'flex',
     alignItems: 'center',
     position: 'relative',
-    transition: 'background-color 0.2s',
+    transition: `background-color ${t.transition.normal}`,
     minWidth: '120px'
   },
   title: {
@@ -39,7 +40,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    fontSize: '14px'
+    fontSize: t.font.size.md,
   },
   input: {
     width: 'calc(100% - 24px)',
@@ -47,25 +48,25 @@ const styles: Record<string, React.CSSProperties> = {
   closeButton: {
     background: 'none',
     border: 'none',
-    color: '#888',
-    fontSize: '14px',
+    color: t.colors.text.secondary,
+    fontSize: t.font.size.md,
     cursor: 'pointer',
     padding: '0 4px',
     position: 'absolute',
     right: '4px',
     top: '50%',
     transform: 'translateY(-50%)',
-    transition: 'color 0.2s'
+    transition: `color ${t.transition.fast}`,
   },
   addButton: {
-    backgroundColor: '#1a1a1a',
-    color: 'white',
-    border: '1px solid #333',
+    backgroundColor: t.colors.bg.primary,
+    color: t.colors.text.primary,
+    border: `1px solid ${t.colors.border.primary}`,
     padding: '6px 12px',
-    borderRadius: '4px',
+    borderRadius: t.radius.md,
     cursor: 'pointer',
-    fontSize: '14px',
-    transition: 'background-color 0.2s',
+    fontSize: t.font.size.md,
+    transition: `background-color ${t.transition.normal}`,
   },
 }
 
@@ -195,25 +196,24 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
             onDragEnd={handleDragEnd}
             style={{
               ...styles.tab,
-              backgroundColor: tab.isActive ? '#333' : '#1a1a1a',
+              backgroundColor: tab.isActive ? t.colors.bg.active : t.colors.bg.primary,
               marginBottom: tab.isActive ? '-1px' : '0',
               opacity: isDragging ? 0.5 : 1,
               cursor: isDraggable ? 'grab' : 'default',
-              border: '1px solid #333',
-              transition: 'opacity 0.2s, margin 0.15s ease-out',
+              border: `1px solid ${t.colors.border.primary}`,
+              transition: `opacity ${t.transition.normal}, margin 0.15s ease-out`,
               position: 'relative',
-              // Add margin to simulate tab space
               marginLeft: showDropIndicator && draggedIndex > index ? '132px' : '0',
               marginRight: showDropIndicator && draggedIndex < index ? '132px' : '0',
             }}
             onMouseOver={(e) => {
               if (!tab.isActive) {
-                e.currentTarget.style.backgroundColor = '#222';
+                e.currentTarget.style.backgroundColor = t.colors.bg.hover;
               }
             }}
             onMouseOut={(e) => {
               if (!tab.isActive) {
-                e.currentTarget.style.backgroundColor = '#1a1a1a';
+                e.currentTarget.style.backgroundColor = t.colors.bg.primary;
               }
             }}
           >
@@ -245,14 +245,14 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
                   left: draggedIndex > index ? '-132px' : 'auto',
                   right: draggedIndex < index ? '-132px' : 'auto',
                   padding: '6px 12px',
-                  color: '#888',
-                  border: '2px dashed #555',
-                  borderRadius: '4px',
+                  color: t.colors.text.secondary,
+                  border: `2px dashed ${t.colors.border.secondary}`,
+                  borderRadius: t.radius.md,
                   display: 'flex',
                   alignItems: 'center',
                   minWidth: '120px',
-                  backgroundColor: 'rgba(51, 51, 51, 0.3)',
-                  boxShadow: '0 0 8px rgba(0, 0, 0, 0.3)',
+                  backgroundColor: 'rgba(45, 45, 74, 0.3)',
+                  boxShadow: t.shadow.sm,
                   pointerEvents: 'none',
                 }}
               >
@@ -296,10 +296,10 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
             }}
             style={styles.closeButton}
             onMouseOver={(e) => {
-              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.color = t.colors.text.primary;
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.color = '#888';
+              e.currentTarget.style.color = t.colors.text.secondary;
             }}
           >
             ×
@@ -310,8 +310,8 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
       <button
         onClick={onTabAdd}
         style={styles.addButton}
-        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'}
-        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+        onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+        onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
       >
         +
       </button>

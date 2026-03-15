@@ -1,4 +1,5 @@
 import { Header, Tab } from "../types";
+import { theme as t } from "../theme";
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
@@ -7,14 +8,14 @@ interface ExportButtonProps {
 
 const styles: Record<string, React.CSSProperties> = {
   button: {
-    backgroundColor: '#1a1a1a',
-    color: 'white',
-    border: '1px solid #333',
+    backgroundColor: t.colors.bg.primary,
+    color: t.colors.text.primary,
+    border: `1px solid ${t.colors.border.primary}`,
     padding: '6px 12px',
-    borderRadius: '4px',
+    borderRadius: t.radius.md,
     cursor: 'pointer',
-    fontSize: '14px',
-    transition: 'background-color 0.2s',
+    fontSize: t.font.size.md,
+    transition: `background-color ${t.transition.normal}`,
     display: 'flex',
     alignItems: 'center',
     gap: '4px'
@@ -46,8 +47,8 @@ export const ExportButton = ({ tabs, headers }: ExportButtonProps) => {
     <button
       onClick={exportStructure}
       style={styles.button}
-      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'}
-      onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+      onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+      onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
     >
       <svg
         width="16"

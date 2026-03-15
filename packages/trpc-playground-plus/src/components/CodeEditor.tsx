@@ -9,6 +9,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { linter, Diagnostic } from '@codemirror/lint';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { validateCodeWithCache } from '../utils/zod-validator';
+import { editorThemeExtension } from '../editorTheme';
 
 interface CodeEditorProps {
   value: string;
@@ -20,8 +21,8 @@ interface CodeEditorProps {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
-    border: '1px solid #333',
-    borderRadius: '4px',
+    border: `1px solid ${t.colors.border.primary}`,
+    borderRadius: t.radius.md,
     overflow: 'hidden',
     height: '100%',
     width: '100%'
@@ -32,6 +33,167 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   }
 }
+
+import { theme as t } from '../theme';
+
+const TYPE_COLORS: Record<string, string> = {
+  query: t.colors.accent.query,
+  mutation: t.colors.accent.mutation,
+  router: t.colors.accent.router,
+  subscription: t.colors.accent.subscription,
+};
+
+function createBadge(text: string, color: string): HTMLSpanElement {
+  const badge = document.createElement('span');
+  badge.textContent = text;
+  Object.assign(badge.style, {
+    display: 'inline-block',
+    padding: '1px 6px',
+    borderRadius: t.radius.sm,
+    fontSize: t.font.size.xs,
+    fontWeight: '600',
+    color: '#fff',
+    backgroundColor: color,
+    marginLeft: '6px',
+    verticalAlign: 'middle',
+  });
+  return badge;
+}
+
+function createCodeBlock(content: string): HTMLElement {
+  const pre = document.createElement('pre');
+  Object.assign(pre.style, {
+    margin: '4px 0 0',
+    padding: '6px 8px',
+    borderRadius: t.radius.sm,
+    backgroundColor: t.colors.bg.code,
+    border: `1px solid ${t.colors.border.primary}`,
+    fontSize: t.font.size.sm,
+    fontFamily: t.font.mono,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    color: t.colors.text.primary,
+    lineHeight: '1.4',
+  });
+  pre.textContent = content;
+  return pre;
+}
+
+function createProcedureInfoNode(
+  name: string,
+  type: string,
+  inputSchema?: string,
+  outputSchema?: string,
+): HTMLElement {
+  const container = document.createElement('div');
+  Object.assign(container.style, {
+    padding: '8px 10px',
+    maxWidth: '360px',
+    lineHeight: '1.5',
+  });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', marginBottom: '6px' });
+  const title = document.createElement('span');
+  title.textContent = name;
+  Object.assign(title.style, { fontWeight: '700', fontSize: t.font.size.base, color: t.colors.text.primary });
+  header.appendChild(title);
+  header.appendChild(createBadge(type, TYPE_COLORS[type] || t.colors.text.muted));
+  container.appendChild(header);
+
+  const addSection = (labelText: string, content: string) => {
+    const label = document.createElement('div');
+    label.textContent = labelText;
+    Object.assign(label.style, {
+      fontSize: t.font.size.xs, fontWeight: '600', color: t.colors.text.secondary,
+      textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
+    });
+    container.appendChild(label);
+    container.appendChild(createCodeBlock(content));
+  };
+
+  if (inputSchema) addSection('Input', inputSchema);
+  if (outputSchema) addSection('Output', outputSchema);
+
+  return container;
+}
+
+function createPropertyInfoNode(
+  name: string,
+  type: string,
+  isRequired: boolean,
+  description?: string,
+): HTMLElement {
+  const container = document.createElement('div');
+  Object.assign(container.style, { padding: '8px 10px', maxWidth: '300px', lineHeight: '1.5' });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '6px' });
+
+  const nameEl = document.createElement('span');
+  nameEl.textContent = name;
+  Object.assign(nameEl.style, { fontWeight: '700', fontSize: t.font.size.base, color: t.colors.text.primary });
+  header.appendChild(nameEl);
+
+  const typeEl = document.createElement('span');
+  typeEl.textContent = type;
+  Object.assign(typeEl.style, { fontSize: t.font.size.sm, color: t.colors.accent.info, fontFamily: t.font.mono });
+  header.appendChild(typeEl);
+
+  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? t.colors.accent.danger : t.colors.text.muted));
+  container.appendChild(header);
+
+  if (description) {
+    const desc = document.createElement('div');
+    desc.textContent = description;
+    Object.assign(desc.style, { marginTop: '6px', fontSize: t.font.size.sm, color: t.colors.text.secondary });
+    container.appendChild(desc);
+  }
+
+  return container;
+}
+
+const autocompleteTheme = EditorView.theme({
+  '.cm-tooltip.cm-tooltip-autocomplete': {
+    border: `1px solid ${t.colors.border.primary} !important`,
+    borderRadius: `${t.radius.md} !important`,
+    backgroundColor: `${t.colors.bg.secondary} !important`,
+    boxShadow: `${t.shadow.lg} !important`,
+  },
+  '.cm-tooltip-autocomplete ul': {
+    fontFamily: `${t.font.mono} !important`,
+    fontSize: `${t.font.size.base} !important`,
+  },
+  '.cm-tooltip-autocomplete ul li': {
+    padding: '4px 10px !important',
+    borderBottom: '1px solid #ffffff08',
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': {
+    backgroundColor: `${t.colors.bg.active} !important`,
+    color: `${t.colors.text.primary} !important`,
+  },
+  '.cm-completionIcon': {
+    width: '1.2em !important',
+    textAlign: 'center',
+  },
+  '.cm-completionIcon-class::after': { content: '"◆"', color: t.colors.accent.router },
+  '.cm-completionIcon-function::after': { content: '"ƒ"', color: t.colors.accent.query },
+  '.cm-completionIcon-method::after': { content: '"ƒ"', color: t.colors.accent.mutation },
+  '.cm-completionIcon-property::after': { content: '"●"', color: t.colors.accent.danger },
+  '.cm-completionIcon-variable::after': { content: '"○"', color: t.colors.text.muted },
+  '.cm-completionIcon-text::after': { content: '"T"', color: t.colors.text.secondary },
+  '.cm-tooltip.cm-completionInfo': {
+    backgroundColor: `${t.colors.bg.secondary} !important`,
+    border: `1px solid ${t.colors.border.primary} !important`,
+    borderRadius: `${t.radius.md} !important`,
+    boxShadow: `${t.shadow.lg} !important`,
+    padding: '0 !important',
+    marginLeft: '4px !important',
+  },
+  '.cm-completionInfo.cm-completionInfo-left': {
+    marginRight: '4px !important',
+  },
+});
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest }) => {
 
@@ -110,19 +272,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   const getCompletionsFromPath = (path: string[]): CompletionResult['options'] => {
     if (path.length === 0 || path[0] === '') {
       return Object.entries(schema).map(([key, def]) => {
-        let info = `tRPC ${def.type}: ${key}`;
+        const inputType = def.type !== 'router' && 'inputSchema' in def && def.inputSchema
+          ? formatSchemaForInfo(def.inputSchema) : undefined;
+        const outputType = def.type !== 'router' && 'outputSchema' in def && def.outputSchema
+          ? formatSchemaForInfo(def.outputSchema) : undefined;
 
-        if (def.type !== 'router' && 'inputSchema' in def && def.inputSchema) {
-          const inputType = formatSchemaForInfo(def.inputSchema);
-          info += `\n\nInput: ${inputType}`;
-        }
-
-        if (def.type !== 'router' && 'outputSchema' in def && def.outputSchema) {
-          const outputType = formatSchemaForInfo(def.outputSchema);
-          info += `\n\nOutput: ${outputType}`;
-        }
-
-        // Determine the apply based on the type
         let apply: string | ((view: any, completion: any, from: number, to: number) => void);
 
         if (['query', 'mutation'].includes(def.type)) {
@@ -131,7 +285,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             const text = `${key}.${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 } // Position before the )
+              selection: { anchor: from + text.length - 1 }
             });
           };
         } else {
@@ -142,7 +296,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
           apply,
-          info
+          info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
         };
       });
     }
@@ -162,19 +316,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
     if (routerDef && routerDef.type === 'router' && routerDef.children) {
       return Object.entries(routerDef.children).map(([key, def]) => {
-        let info = `tRPC ${def.type}: ${key}`;
+        const inputType = def.type !== 'router' && 'inputSchema' in def && def.inputSchema
+          ? formatSchemaForInfo(def.inputSchema) : undefined;
+        const outputType = def.type !== 'router' && 'outputSchema' in def && def.outputSchema
+          ? formatSchemaForInfo(def.outputSchema) : undefined;
 
-        if (def.type !== 'router' && 'inputSchema' in def && def.inputSchema) {
-          const inputType = formatSchemaForInfo(def.inputSchema);
-          info += `\nInput: ${inputType}`;
-        }
-
-        if (def.type !== 'router' && 'outputSchema' in def && def.outputSchema) {
-          const outputType = formatSchemaForInfo(def.outputSchema);
-          info += `\nOutput: ${outputType}`;
-        }
-
-        // Determine the apply based on the type
         let apply: string | ((view: any, completion: any, from: number, to: number) => void);
         if (['query', 'mutation'].includes(def.type)) {
           const methodName = def.type === 'mutation' ? 'mutate' : 'query';
@@ -182,7 +328,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             const text = `${key}.${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 } // Position before the )
+              selection: { anchor: from + text.length - 1 }
             });
           };
         } else {
@@ -193,35 +339,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
           apply,
-          info
+          info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
         };
       });
     } else if (routerDef) {
-      const type = routerDef.type === 'mutation' ? 'mutate' : 'query';
-      let info = `Execute this procedure as ${type}`;
-
-      if (routerDef.type !== 'router' && 'inputSchema' in routerDef && routerDef.inputSchema) {
-        const inputType = formatSchemaForInfo(routerDef.inputSchema);
-        info += `\nInput: ${inputType}`;
-      }
-
-      if (routerDef.type !== 'router' && 'outputSchema' in routerDef && routerDef.outputSchema) {
-        const outputType = formatSchemaForInfo(routerDef.outputSchema);
-        info += `\nOutput: ${outputType}`;
-      }
+      const methodName = routerDef.type === 'mutation' ? 'mutate' : 'query';
+      const inputType = routerDef.type !== 'router' && 'inputSchema' in routerDef && routerDef.inputSchema
+        ? formatSchemaForInfo(routerDef.inputSchema) : undefined;
+      const outputType = routerDef.type !== 'router' && 'outputSchema' in routerDef && routerDef.outputSchema
+        ? formatSchemaForInfo(routerDef.outputSchema) : undefined;
 
       return [
         {
-          label: type,
+          label: methodName,
           type: 'function',
-          apply: (view, completion, from, to) => {
-            const text = `${type}()`;
+          apply: (view, _completion, from, to) => {
+            const text = `${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 } // Position before the )
+              selection: { anchor: from + text.length - 1 }
             });
           },
-          info
+          info: () => createProcedureInfoNode(methodName, routerDef.type, inputType, outputType),
         }
       ];
     }
@@ -355,20 +494,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                 return lastChar !== ',' && lastChar !== '{' && lastChar !== '[';
               })();
 
-              // Suggest only properties not yet used
               const required = inputSchema.required || [];
               const options = Object.entries(inputSchema.properties)
-                .filter(([key]) => !usedKeys.has(key)) // Filter already used keys
+                .filter(([key]) => !usedKeys.has(key))
                 .map(([key, propSchema]: [string, any]) => {
                   const isRequired = required.includes(key);
                   const type = propSchema.type || 'unknown';
 
-                  let info = `${key}: ${type}`;
-                  if (isRequired) info += ' (required)';
-                  else info += ' (optional)';
-                  if (propSchema.description) info += `\n${propSchema.description}`;
-
-                  // Build the value to apply
                   let apply = key;
                   if (type === 'object') apply = `${key}: {}`;
                   else if (type === 'array') apply = `${key}: []`;
@@ -377,7 +509,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   else if (type === 'boolean') apply = `${key}: false`;
                   else apply = `${key}: `;
 
-                  // Add a comma at the beginning if necessary
                   if (needsComma) {
                     apply = ', ' + apply;
                   }
@@ -386,7 +517,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                     label: key,
                     type: isRequired ? 'property' : 'variable',
                     apply,
-                    info
+                    info: () => createPropertyInfoNode(key, type, isRequired, propSchema.description),
                   };
                 });
 
@@ -497,7 +628,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             button.className = "play-button";
             button.style.fontSize = "10px";
             button.style.border = "none";
-            button.style.backgroundColor = "#4CAF50";
+            button.style.backgroundColor = t.colors.accent.play;
             button.style.color = "white";
             button.style.borderRadius = "50%";
             button.style.width = "18px";
@@ -532,7 +663,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         theme={vscodeDark}
         extensions={[
           javascript({ typescript: true }),
+          editorThemeExtension,
           trpcAutocompleteExtension,
+          autocompleteTheme,
           dotTriggerExtension,
           trpcLinterExtension,
           playButtonExtension

@@ -5,6 +5,7 @@ import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
 import { Tab } from './types'
 import Headers from './components/Headers'
+import { theme as t } from './theme'
 
 interface RouterSchema {
   [key: string]: {
@@ -156,42 +157,37 @@ const Playground = () => {
     fileInput.click();
   };
 
+  const btnStyle: React.CSSProperties = {
+    backgroundColor: t.colors.bg.primary,
+    color: t.colors.text.primary,
+    border: `1px solid ${t.colors.border.primary}`,
+    padding: '6px 12px',
+    borderRadius: t.radius.md,
+    cursor: 'pointer',
+    fontSize: t.font.size.md,
+    transition: `background-color ${t.transition.normal}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  };
+
   return (
     <>
       <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
-      <div style={{ padding: 10, fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ padding: 10, fontFamily: t.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ color: 'white' }}>Connected to : <code>{config.trpcEndpoint}</code></p>
+          <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
+            Connected to : <code>{config.trpcEndpoint}</code>
+          </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <ExportButton tabs={tabs} headers={headers} />
             <button
               onClick={importStructure}
-              style={{
-                backgroundColor: '#1a1a1a',
-                color: 'white',
-                border: '1px solid #333',
-                padding: '6px 12px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'background-color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+              style={btnStyle}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 10 12 15 7 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -200,18 +196,9 @@ const Playground = () => {
             </button>
             <button
               onClick={() => setHeadersOpen(!headersOpen)}
-              style={{
-                backgroundColor: '#1a1a1a',
-                color: 'white',
-                border: '1px solid #333',
-                padding: '6px 12px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#333'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+              style={btnStyle}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
             >
               Headers
             </button>

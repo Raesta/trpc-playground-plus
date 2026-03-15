@@ -2,6 +2,8 @@ import React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { json } from "@codemirror/lang-json"
+import { theme as t } from '../theme';
+import { editorThemeExtension } from '../editorTheme';
 
 interface JsonViewerProps {
   value: string;
@@ -13,10 +15,10 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     position: 'relative',
-    border: '1px solid #333',
-    borderRadius: '4px',
+    border: `1px solid ${t.colors.border.primary}`,
+    borderRadius: t.radius.md,
     overflow: 'hidden',
-    backgroundColor: '#1e1e1e',
+    backgroundColor: t.colors.bg.primary,
     height: '100%',
     width: '100%'
   },
@@ -31,7 +33,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(30, 30, 30, 0.75)',
+    backgroundColor: 'rgba(22, 27, 34, 0.75)',
     zIndex: 10,
   },
 }
@@ -49,8 +51,8 @@ const Spinner: React.FC = () => (
       style={{
         width: 32,
         height: 32,
-        border: '3px solid #444',
-        borderTopColor: '#0ea5e9',
+        border: `3px solid ${t.colors.border.primary}`,
+        borderTopColor: t.colors.accent.spinner,
         borderRadius: '50%',
         animation: 'trpc-spin 0.7s linear infinite',
       }}
@@ -71,6 +73,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
         theme={vscodeDark}
         extensions={[
           json(),
+          editorThemeExtension,
         ]}
         onChange={onChange}
         editable={false}
