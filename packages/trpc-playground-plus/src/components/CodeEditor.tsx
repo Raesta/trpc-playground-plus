@@ -298,13 +298,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
           // If the schema is an object, suggest the properties
           if (inputSchema.type === 'object' && inputSchema.properties) {
-            const hasOpenBrace = afterProcedure.includes('{');
+            // Use the full document to detect braces and used keys,
+            // not just the text before cursor
+            const fullText = context.state.doc.toString();
+            const fullAfterProcedure = fullText.substring(procedureStart);
+            const hasOpenBrace = fullAfterProcedure.includes('{');
 
-            // Use word if available, otherwise use the current position
             const from = word ? word.from : context.pos;
 
             if (!hasOpenBrace) {
-              // Suggest adding {} with the cursor between the braces
               return {
                 from,
                 options: [
@@ -315,7 +317,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                       const text = '{}';
                       view.dispatch({
                         changes: { from, to, insert: text },
-                        selection: { anchor: from + 1 } // Position between the braces
+                        selection: { anchor: from + 1 }
                       });
                     },
                     info: 'Add argument object'
@@ -323,13 +325,23 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                 ]
               };
             } else {
-              // Extract properties already present in the object
+              // Scan used keys in the full argument object, not just before cursor
               const usedKeys = new Set<string>();
-              const propertyRegex = /(\w+)\s*:/g;
-              let propMatch;
-
-              while ((propMatch = propertyRegex.exec(afterProcedure)) !== null) {
-                usedKeys.add(propMatch[1]);
+              const braceStart = fullAfterProcedure.indexOf('{');
+              if (braceStart !== -1) {
+                let depth = 1;
+                let scanPos = braceStart + 1;
+                while (scanPos < fullAfterProcedure.length && depth > 0) {
+                  if (fullAfterProcedure[scanPos] === '{') depth++;
+                  else if (fullAfterProcedure[scanPos] === '}') depth--;
+                  scanPos++;
+                }
+                const objectContent = fullAfterProcedure.substring(braceStart + 1, scanPos - 1);
+                const propertyRegex = /(\w+)\s*:/g;
+                let propMatch;
+                while ((propMatch = propertyRegex.exec(objectContent)) !== null) {
+                  usedKeys.add(propMatch[1]);
+                }
               }
 
               // Detect if we need to add a comma before the new property
