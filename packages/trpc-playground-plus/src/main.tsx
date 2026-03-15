@@ -24,6 +24,7 @@ const Playground = () => {
   const [config, setConfig] = useState<PlaygroundConfig | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [result, setResult] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [headersOpen, setHeadersOpen] = useState(false);
   const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
 
@@ -85,6 +86,7 @@ const Playground = () => {
 
   const executeSpecificCode = async (specificCode: string) => {
     setResult('')
+    setIsLoading(true);
     const headersObject = getHeadersObject();
     const trpcClient = createDynamicTRPCClient({ trpcUrl: config.trpcEndpoint, transformer: config.transformer, headers: headersObject });
 
@@ -102,6 +104,8 @@ const Playground = () => {
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -222,6 +226,7 @@ const Playground = () => {
             onResultChange={setResult}
             schema={config.schema}
             onPlayRequest={executeSpecificCode}
+            isLoading={isLoading}
           />
         </div>
       </div>

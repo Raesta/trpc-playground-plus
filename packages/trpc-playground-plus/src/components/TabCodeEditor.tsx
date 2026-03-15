@@ -13,6 +13,7 @@ interface TabCodeEditorProps {
   onResultChange: (value: string) => void;
   schema: RouterSchema;
   onPlayRequest?: (code: string) => Promise<void>;
+  isLoading?: boolean;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -39,7 +40,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   resultValue,
   onResultChange,
   schema,
-  onPlayRequest
+  onPlayRequest,
+  isLoading
 }) => {
   useEffect(() => {
     if (tabs.length === 0) {
@@ -147,6 +149,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         <JsonViewer
           value={resultValue}
           onChange={onResultChange}
+          isLoading={isLoading}
         />
       </div>
     </div>

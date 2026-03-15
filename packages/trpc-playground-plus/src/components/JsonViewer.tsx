@@ -6,11 +6,13 @@ import { json } from "@codemirror/lang-json"
 interface JsonViewerProps {
   value: string;
   onChange: (value: string) => void;
+  isLoading?: boolean;
 }
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
+    position: 'relative',
     border: '1px solid #333',
     borderRadius: '4px',
     overflow: 'hidden',
@@ -22,12 +24,48 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     width: '100%',
     overflow: 'hidden',
-  }
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(30, 30, 30, 0.75)',
+    zIndex: 10,
+  },
 }
 
-export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange }) => {
+const spinnerKeyframes = `
+@keyframes trpc-spin {
+  to { transform: rotate(360deg); }
+}
+`;
+
+const Spinner: React.FC = () => (
+  <>
+    <style>{spinnerKeyframes}</style>
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        border: '3px solid #444',
+        borderTopColor: '#0ea5e9',
+        borderRadius: '50%',
+        animation: 'trpc-spin 0.7s linear infinite',
+      }}
+    />
+  </>
+);
+
+export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoading }) => {
   return (
     <div style={styles.container}>
+      {isLoading && (
+        <div style={styles.loadingOverlay}>
+          <Spinner />
+        </div>
+      )}
       <CodeMirror
         value={value}
         theme={vscodeDark}
