@@ -1,9 +1,10 @@
-import React from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import React, { useRef } from 'react';
+import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { json } from "@codemirror/lang-json"
 import { theme as t } from '../theme';
 import { editorThemeExtension } from '../editorTheme';
+import { EditorToolbar } from './EditorToolbar';
 
 interface JsonViewerProps {
   value: string;
@@ -14,6 +15,7 @@ interface JsonViewerProps {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
+    flexDirection: 'column',
     position: 'relative',
     border: `1px solid ${t.colors.border.primary}`,
     borderRadius: t.radius.md,
@@ -26,6 +28,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     width: '100%',
     overflow: 'hidden',
+    minHeight: 0,
+    flex: 1,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -61,14 +65,18 @@ const Spinner: React.FC = () => (
 );
 
 export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoading }) => {
+  const editorRef = useRef<ReactCodeMirrorRef>(null);
+
   return (
     <div style={styles.container}>
+      <EditorToolbar editorRef={editorRef} />
       {isLoading && (
         <div style={styles.loadingOverlay}>
           <Spinner />
         </div>
       )}
       <CodeMirror
+        ref={editorRef}
         value={value}
         theme={vscodeDark}
         extensions={[

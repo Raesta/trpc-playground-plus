@@ -1,5 +1,5 @@
-import React from 'react';
-import CodeMirror from '@uiw/react-codemirror';
+import React, { useRef } from 'react';
+import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
 import { RouterSchema } from '../types';
@@ -10,6 +10,7 @@ import { linter, Diagnostic } from '@codemirror/lint';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { validateCodeWithCache } from '../utils/zod-validator';
 import { editorThemeExtension } from '../editorTheme';
+import { EditorToolbar } from './EditorToolbar';
 
 interface CodeEditorProps {
   value: string;
@@ -21,6 +22,7 @@ interface CodeEditorProps {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
+    flexDirection: 'column',
     border: `1px solid ${t.colors.border.primary}`,
     borderRadius: t.radius.md,
     overflow: 'hidden',
@@ -31,6 +33,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     width: '100%',
     overflow: 'hidden',
+    minHeight: 0,
+    flex: 1,
   }
 }
 
@@ -196,6 +200,7 @@ const autocompleteTheme = EditorView.theme({
 });
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest }) => {
+  const editorRef = useRef<ReactCodeMirrorRef>(null);
 
   const createTrpcLinter = React.useCallback((schema: RouterSchema) => {
     return linter((view) => {
@@ -658,7 +663,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
   return (
     <div style={styles.container}>
+      <EditorToolbar editorRef={editorRef} />
       <CodeMirror
+        ref={editorRef}
         value={value}
         theme={vscodeDark}
         extensions={[
