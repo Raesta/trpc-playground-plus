@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { CodeEditor } from './CodeEditor';
 import { Tabs } from './Tabs';
 import { RouterSchema, Tab } from '../types';
 import { JsonViewer } from './JsonViewer';
+import { theme as t } from '../theme';
 
 const generateId = () => `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -16,6 +17,9 @@ interface TabCodeEditorProps {
   isLoading?: boolean;
 }
 
+const DIVIDER_HIT = 16;
+const MIN_PANEL_PCT = 15;
+
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
@@ -25,13 +29,55 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%'
   },
   viewers: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 8,
+    display: 'flex',
+    gap: 16,
     height: 'calc(100% - 40px)',
     width: '100%',
-    minHeight: 0
-  }
+    minHeight: 0,
+  },
+  divider: {
+    width: DIVIDER_HIT,
+    cursor: 'col-resize',
+    flexShrink: 0,
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -DIVIDER_HIT / 2 + 0.5,
+    marginRight: -DIVIDER_HIT / 2 + 0.5,
+    zIndex: 2,
+  },
+  dividerLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '50%',
+    width: '1px',
+    backgroundColor: t.colors.border.primary,
+    transition: `background-color ${t.transition.fast}`,
+    pointerEvents: 'none',
+  },
+  dividerHandle: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    flexDirection: 'column',
+    gap: '2px',
+    padding: '4px 3px',
+    borderRadius: t.radius.sm,
+    backgroundColor: t.colors.bg.primary,
+    border: `1px solid ${t.colors.border.primary}`,
+    color: t.colors.text.muted,
+    fontSize: '8px',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    transition: `all ${t.transition.fast}`,
+    pointerEvents: 'none',
+  },
+  panel: {
+    overflow: 'hidden',
+    minWidth: 0,
+  },
 }
 
 export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
@@ -126,6 +172,35 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
 
   const activeTab = tabs.find(tab => tab.isActive);
 
+  const [leftPct, setLeftPct] = useState(50);
+  const viewersRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragging.current || !viewersRef.current) return;
+      const rect = viewersRef.current.getBoundingClientRect();
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setLeftPct(Math.min(100 - MIN_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct)));
+    };
+
+    const onMouseUp = () => {
+      dragging.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   return (
     <div style={styles.container}>
       <Tabs
@@ -137,20 +212,62 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         onTabReorder={handleTabReorder}
       />
 
-      <div style={styles.viewers}>
-        {activeTab && (
-          <CodeEditor
-            value={activeTab.content}
-            onChange={handleCodeChange}
-            schema={schema}
-            onPlayRequest={onPlayRequest}
+      <div ref={viewersRef} style={styles.viewers}>
+        <div style={{ ...styles.panel, width: `${leftPct}%` }}>
+          {activeTab && (
+            <CodeEditor
+              value={activeTab.content}
+              onChange={handleCodeChange}
+              schema={schema}
+              onPlayRequest={onPlayRequest}
+            />
+          )}
+        </div>
+        <div
+          style={styles.divider}
+          onMouseDown={handleMouseDown}
+          onMouseOver={(e) => {
+            const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
+            const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
+            if (line) line.style.backgroundColor = t.colors.accent.primary;
+            if (handle) { handle.style.borderColor = t.colors.accent.primary; handle.style.color = t.colors.text.secondary; }
+          }}
+          onMouseOut={(e) => {
+            if (dragging.current) return;
+            const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
+            const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
+            if (line) line.style.backgroundColor = t.colors.border.primary;
+            if (handle) { handle.style.borderColor = t.colors.border.primary; handle.style.color = t.colors.text.muted; }
+          }}
+        >
+          <div data-divider-line="" style={styles.dividerLine} />
+          <div data-divider-handle="" style={styles.dividerHandle}>
+            <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor">
+              <path d="M5 4L1 1v6l4-3z" transform="rotate(180 3 4)" />
+            </svg>
+            <span
+              style={{
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+                letterSpacing: '0.2em',
+                transform: 'rotate(180deg)',
+                display: 'inline-block'
+              }}
+            >
+              Draggeable
+            </span>
+            <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor">
+              <path d="M1 4l4-3v6L1 4z" transform="rotate(180 3 4)" />
+            </svg>
+          </div>
+        </div>
+        <div style={{ ...styles.panel, width: `${100 - leftPct}%` }}>
+          <JsonViewer
+            value={resultValue}
+            onChange={onResultChange}
+            isLoading={isLoading}
           />
-        )}
-        <JsonViewer
-          value={resultValue}
-          onChange={onResultChange}
-          isLoading={isLoading}
-        />
+        </div>
       </div>
     </div>
   );
