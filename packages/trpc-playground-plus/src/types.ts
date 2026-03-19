@@ -44,3 +44,7 @@ export interface Header {
   value: string;
   enabled: boolean;
 }
+
+export interface PlaygroundSettings {
+  splitPosition: number;
+}

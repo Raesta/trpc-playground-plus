@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
@@ -6,6 +6,7 @@ import { ExportButton } from './components/ExportButton'
 import { Tab } from './types'
 import Headers from './components/Headers'
 import { theme as t } from './theme'
+import { loadSettings, saveSettings } from './settings'
 
 interface RouterSchema {
   [key: string]: {
@@ -28,6 +29,12 @@ const Playground = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [headersOpen, setHeadersOpen] = useState(false);
   const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
+  const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
+
+  const handleSplitChange = useCallback((pct: number) => {
+    setSplitPosition(pct);
+    saveSettings({ splitPosition: pct });
+  }, []);
 
   const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
     localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
@@ -146,6 +153,12 @@ const Playground = () => {
             setHeaders(importedData.headers);
             localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
           }
+
+          if (importedData.settings && typeof importedData.settings === 'object') {
+            saveSettings(importedData.settings);
+            const merged = loadSettings();
+            setSplitPosition(merged.splitPosition);
+          }
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -180,7 +193,7 @@ const Playground = () => {
             Connected to : <code>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} headers={headers} />
+            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} />
             <button
               onClick={importStructure}
               style={btnStyle}
@@ -214,6 +227,8 @@ const Playground = () => {
             schema={config.schema}
             onPlayRequest={executeSpecificCode}
             isLoading={isLoading}
+            splitPosition={splitPosition}
+            onSplitChange={handleSplitChange}
           />
         </div>
       </div>

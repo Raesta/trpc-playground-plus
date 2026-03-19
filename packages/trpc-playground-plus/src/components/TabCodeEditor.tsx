@@ -15,6 +15,8 @@ interface TabCodeEditorProps {
   schema: RouterSchema;
   onPlayRequest?: (code: string) => Promise<void>;
   isLoading?: boolean;
+  splitPosition: number;
+  onSplitChange: (pct: number) => void;
 }
 
 const DIVIDER_HIT = 16;
@@ -87,7 +89,9 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   onResultChange,
   schema,
   onPlayRequest,
-  isLoading
+  isLoading,
+  splitPosition,
+  onSplitChange,
 }) => {
   useEffect(() => {
     if (tabs.length === 0) {
@@ -172,7 +176,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
 
   const activeTab = tabs.find(tab => tab.isActive);
 
-  const [leftPct, setLeftPct] = useState(50);
+  const [leftPct, setLeftPct] = useState(splitPosition);
+  useEffect(() => { setLeftPct(splitPosition); }, [splitPosition]);
   const viewersRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -184,7 +189,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
       if (!dragging.current || !viewersRef.current) return;
       const rect = viewersRef.current.getBoundingClientRect();
       const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      setLeftPct(Math.min(100 - MIN_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct)));
+      const clamped = Math.min(100 - MIN_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct));
+      setLeftPct(clamped);
     };
 
     const onMouseUp = () => {
@@ -193,13 +199,14 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
       document.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      setLeftPct((current) => { onSplitChange(current); return current; });
     };
 
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  }, []);
+  }, [onSplitChange]);
 
   return (
     <div style={styles.container}>
