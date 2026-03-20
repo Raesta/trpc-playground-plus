@@ -62,19 +62,22 @@ const styles: Record<string, React.CSSProperties> = {
   dividerHandle: {
     position: 'relative',
     display: 'flex',
-    alignItems: 'center',
     flexDirection: 'column',
-    gap: '2px',
-    padding: '4px 3px',
+    alignItems: 'center',
+    gap: '3px',
+    padding: '6px 2px',
     borderRadius: t.radius.sm,
     backgroundColor: t.colors.bg.primary,
     border: `1px solid ${t.colors.border.primary}`,
-    color: t.colors.text.muted,
-    fontSize: '8px',
-    lineHeight: 1,
-    whiteSpace: 'nowrap',
     transition: `all ${t.transition.fast}`,
     pointerEvents: 'none',
+  },
+  dividerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: '50%',
+    backgroundColor: t.colors.text.muted,
+    transition: `background-color ${t.transition.fast}`,
   },
   panel: {
     overflow: 'hidden',
@@ -237,35 +240,23 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
             const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
             const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
             if (line) line.style.backgroundColor = t.colors.accent.primary;
-            if (handle) { handle.style.borderColor = t.colors.accent.primary; handle.style.color = t.colors.text.secondary; }
+            if (handle) handle.style.borderColor = t.colors.accent.primary;
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach(d => d.style.backgroundColor = t.colors.text.secondary);
           }}
           onMouseOut={(e) => {
             if (dragging.current) return;
             const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
             const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
             if (line) line.style.backgroundColor = t.colors.border.primary;
-            if (handle) { handle.style.borderColor = t.colors.border.primary; handle.style.color = t.colors.text.muted; }
+            if (handle) handle.style.borderColor = t.colors.border.primary;
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach(d => d.style.backgroundColor = t.colors.text.muted);
           }}
         >
           <div data-divider-line="" style={styles.dividerLine} />
           <div data-divider-handle="" style={styles.dividerHandle}>
-            <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor">
-              <path d="M5 4L1 1v6l4-3z" transform="rotate(180 3 4)" />
-            </svg>
-            <span
-              style={{
-                writingMode: 'vertical-rl',
-                textOrientation: 'mixed',
-                letterSpacing: '0.2em',
-                transform: 'rotate(180deg)',
-                display: 'inline-block'
-              }}
-            >
-              Draggeable
-            </span>
-            <svg width="6" height="8" viewBox="0 0 6 8" fill="currentColor">
-              <path d="M1 4l4-3v6L1 4z" transform="rotate(180 3 4)" />
-            </svg>
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} data-divider-dot="" style={styles.dividerDot} />
+            ))}
           </div>
         </div>
         <div style={{ ...styles.panel, width: `${100 - leftPct}%` }}>
