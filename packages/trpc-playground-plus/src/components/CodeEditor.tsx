@@ -561,11 +561,18 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
     if (!word || (word.from === word.to && !context.explicit)) return null;
 
-    const trpcPathMatch = text.match(/trpc((?:\.\w+)*)?\.?$/);
+    const trpcPathMatch = text.match(/trpc((?:\.\w+)*)(\.)?$/);
 
     if (trpcPathMatch) {
       const pathStr = trpcPathMatch[1] || '';
-      const path = pathStr ? pathStr.substring(1).split('.') : [''];
+      const endsWithDot = !!trpcPathMatch[2];
+      const segments = pathStr ? pathStr.substring(1).split('.') : [];
+
+      // If text ends with a dot (e.g. "trpc.hello."), navigate to that segment
+      // If not (e.g. "trpc.h"), navigate to parent level and let CodeMirror filter by typed chars
+      const path = endsWithDot
+        ? (segments.length > 0 ? segments : [''])
+        : (segments.length > 1 ? segments.slice(0, -1) : ['']);
 
       const options = getCompletionsFromPath(path);
 
