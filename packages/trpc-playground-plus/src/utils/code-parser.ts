@@ -69,7 +69,20 @@ function parseObjectLiteral(str: string): any {
 
     // Extract the property name
     const keyMatch = content.slice(i).match(/^(\w+)\s*:/);
-    if (!keyMatch) break;
+    if (!keyMatch) {
+      // Handle shorthand property syntax: { text, name } → { text: text, name: name }
+      const shorthandMatch = content.slice(i).match(/^(\w+)\s*[,}]?/);
+      if (shorthandMatch) {
+        const key = shorthandMatch[1];
+        result[key] = `__JS_EXPR__${key}`;
+        i += key.length;
+        // Skip spaces and comma
+        while (i < content.length && /\s/.test(content[i])) i++;
+        if (content[i] === ',') i++;
+        continue;
+      }
+      break;
+    }
 
     const key = keyMatch[1];
     i += keyMatch[0].length;

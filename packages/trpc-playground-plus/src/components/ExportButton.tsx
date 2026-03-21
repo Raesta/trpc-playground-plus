@@ -1,10 +1,11 @@
-import { Header, PlaygroundSettings, Tab } from "../types";
+import { Header, PlaygroundSettings, Tab, Variable } from "../types";
 import { theme as t } from "../theme";
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
   headers: Array<Header>;
   settings: PlaygroundSettings;
+  variables: Array<Variable>;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -23,12 +24,13 @@ const styles: Record<string, React.CSSProperties> = {
   }
 }
 
-export const ExportButton = ({ tabs, headers, settings }: ExportButtonProps) => {
+export const ExportButton = ({ tabs, headers, settings, variables }: ExportButtonProps) => {
   const exportStructure = () => {
     const exportData = {
       tabs,
       headers,
       settings,
+      variables,
       createdAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });

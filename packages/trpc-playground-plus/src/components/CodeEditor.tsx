@@ -2,13 +2,13 @@ import React, { useRef } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
-import { RouterSchema } from '../types';
+import { RouterSchema, Variable } from '../types';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { javascript } from "@codemirror/lang-javascript";
 import { linter, Diagnostic } from '@codemirror/lint';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
-import { validateCodeWithCache } from '../utils/zod-validator';
+import { validateCodeWithCache, resolveVariableType } from '../utils/zod-validator';
 import { editorThemeExtension } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -17,14 +17,16 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   schema: RouterSchema;
   onPlayRequest?: (code: string) => Promise<void>;
+  variables?: Variable[];
+  onVariablesClick?: () => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    border: `1px solid ${t.colors.border.primary}`,
-    borderRadius: t.radius.md,
+    border: `1px solid ${theme.colors.border.primary}`,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
     height: '100%',
     width: '100%'
@@ -38,13 +40,13 @@ const styles: Record<string, React.CSSProperties> = {
   }
 }
 
-import { theme as t } from '../theme';
+import { theme } from '../theme';
 
 const TYPE_COLORS: Record<string, string> = {
-  query: t.colors.accent.query,
-  mutation: t.colors.accent.mutation,
-  router: t.colors.accent.router,
-  subscription: t.colors.accent.subscription,
+  query: theme.colors.accent.query,
+  mutation: theme.colors.accent.mutation,
+  router: theme.colors.accent.router,
+  subscription: theme.colors.accent.subscription,
 };
 
 function createBadge(text: string, color: string): HTMLSpanElement {
@@ -53,8 +55,8 @@ function createBadge(text: string, color: string): HTMLSpanElement {
   Object.assign(badge.style, {
     display: 'inline-block',
     padding: '1px 6px',
-    borderRadius: t.radius.sm,
-    fontSize: t.font.size.xs,
+    borderRadius: theme.radius.sm,
+    fontSize: theme.font.size.xs,
     fontWeight: '600',
     color: '#fff',
     backgroundColor: color,
@@ -69,14 +71,14 @@ function createCodeBlock(content: string): HTMLElement {
   Object.assign(pre.style, {
     margin: '4px 0 0',
     padding: '6px 8px',
-    borderRadius: t.radius.sm,
-    backgroundColor: t.colors.bg.code,
-    border: `1px solid ${t.colors.border.primary}`,
-    fontSize: t.font.size.sm,
-    fontFamily: t.font.mono,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.bg.code,
+    border: `1px solid ${theme.colors.border.primary}`,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.mono,
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
-    color: t.colors.text.primary,
+    color: theme.colors.text.primary,
     lineHeight: '1.4',
   });
   pre.textContent = content;
@@ -100,16 +102,16 @@ function createProcedureInfoNode(
   Object.assign(header.style, { display: 'flex', alignItems: 'center', marginBottom: '6px' });
   const title = document.createElement('span');
   title.textContent = name;
-  Object.assign(title.style, { fontWeight: '700', fontSize: t.font.size.base, color: t.colors.text.primary });
+  Object.assign(title.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(title);
-  header.appendChild(createBadge(type, TYPE_COLORS[type] || t.colors.text.muted));
+  header.appendChild(createBadge(type, TYPE_COLORS[type] || theme.colors.text.muted));
   container.appendChild(header);
 
   const addSection = (labelText: string, content: string) => {
     const label = document.createElement('div');
     label.textContent = labelText;
     Object.assign(label.style, {
-      fontSize: t.font.size.xs, fontWeight: '600', color: t.colors.text.secondary,
+      fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
       textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
     });
     container.appendChild(label);
@@ -136,21 +138,21 @@ function createPropertyInfoNode(
 
   const nameEl = document.createElement('span');
   nameEl.textContent = name;
-  Object.assign(nameEl.style, { fontWeight: '700', fontSize: t.font.size.base, color: t.colors.text.primary });
+  Object.assign(nameEl.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(nameEl);
 
   const typeEl = document.createElement('span');
   typeEl.textContent = type;
-  Object.assign(typeEl.style, { fontSize: t.font.size.sm, color: t.colors.accent.info, fontFamily: t.font.mono });
+  Object.assign(typeEl.style, { fontSize: theme.font.size.sm, color: theme.colors.accent.info, fontFamily: theme.font.mono });
   header.appendChild(typeEl);
 
-  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? t.colors.accent.danger : t.colors.text.muted));
+  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? theme.colors.accent.danger : theme.colors.text.muted));
   container.appendChild(header);
 
   if (description) {
     const desc = document.createElement('div');
     desc.textContent = description;
-    Object.assign(desc.style, { marginTop: '6px', fontSize: t.font.size.sm, color: t.colors.text.secondary });
+    Object.assign(desc.style, { marginTop: '6px', fontSize: theme.font.size.sm, color: theme.colors.text.secondary });
     container.appendChild(desc);
   }
 
@@ -159,38 +161,38 @@ function createPropertyInfoNode(
 
 const autocompleteTheme = EditorView.theme({
   '.cm-tooltip.cm-tooltip-autocomplete': {
-    border: `1px solid ${t.colors.border.primary} !important`,
-    borderRadius: `${t.radius.md} !important`,
-    backgroundColor: `${t.colors.bg.secondary} !important`,
-    boxShadow: `${t.shadow.lg} !important`,
+    border: `1px solid ${theme.colors.border.primary} !important`,
+    borderRadius: `${theme.radius.md} !important`,
+    backgroundColor: `${theme.colors.bg.secondary} !important`,
+    boxShadow: `${theme.shadow.lg} !important`,
   },
   '.cm-tooltip-autocomplete ul': {
-    fontFamily: `${t.font.mono} !important`,
-    fontSize: `${t.font.size.base} !important`,
+    fontFamily: `${theme.font.mono} !important`,
+    fontSize: `${theme.font.size.base} !important`,
   },
   '.cm-tooltip-autocomplete ul li': {
     padding: '4px 10px !important',
     borderBottom: '1px solid #ffffff08',
   },
   '.cm-tooltip-autocomplete ul li[aria-selected]': {
-    backgroundColor: `${t.colors.bg.active} !important`,
-    color: `${t.colors.text.primary} !important`,
+    backgroundColor: `${theme.colors.bg.active} !important`,
+    color: `${theme.colors.text.primary} !important`,
   },
   '.cm-completionIcon': {
     width: '1.2em !important',
     textAlign: 'center',
   },
-  '.cm-completionIcon-class::after': { content: '"◆"', color: t.colors.accent.router },
-  '.cm-completionIcon-function::after': { content: '"ƒ"', color: t.colors.accent.query },
-  '.cm-completionIcon-method::after': { content: '"ƒ"', color: t.colors.accent.mutation },
-  '.cm-completionIcon-property::after': { content: '"●"', color: t.colors.accent.danger },
-  '.cm-completionIcon-variable::after': { content: '"○"', color: t.colors.text.muted },
-  '.cm-completionIcon-text::after': { content: '"T"', color: t.colors.text.secondary },
+  '.cm-completionIcon-class::after': { content: '"◆"', color: theme.colors.accent.router },
+  '.cm-completionIcon-function::after': { content: '"ƒ"', color: theme.colors.accent.query },
+  '.cm-completionIcon-method::after': { content: '"ƒ"', color: theme.colors.accent.mutation },
+  '.cm-completionIcon-property::after': { content: '"●"', color: theme.colors.accent.danger },
+  '.cm-completionIcon-variable::after': { content: '"○"', color: theme.colors.text.muted },
+  '.cm-completionIcon-text::after': { content: '"T"', color: theme.colors.text.secondary },
   '.cm-tooltip.cm-completionInfo': {
-    backgroundColor: `${t.colors.bg.secondary} !important`,
-    border: `1px solid ${t.colors.border.primary} !important`,
-    borderRadius: `${t.radius.md} !important`,
-    boxShadow: `${t.shadow.lg} !important`,
+    backgroundColor: `${theme.colors.bg.secondary} !important`,
+    border: `1px solid ${theme.colors.border.primary} !important`,
+    borderRadius: `${theme.radius.md} !important`,
+    boxShadow: `${theme.shadow.lg} !important`,
     padding: '0 !important',
     marginLeft: '4px !important',
   },
@@ -199,10 +201,16 @@ const autocompleteTheme = EditorView.theme({
   },
 });
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick }) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
 
-  const createTrpcLinter = React.useCallback((schema: RouterSchema) => {
+  const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
+    const variableTypes = new Map(
+      variables
+        .filter(v => v.enabled && v.key.trim())
+        .map(v => [v.key.trim(), resolveVariableType(v.value)] as const)
+    );
+
     return linter((view) => {
       const code = view.state.doc.toString();
       const parseResult = parseCodeForTrpcCalls(code);
@@ -220,7 +228,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
       // Validate tRPC calls
       if (parseResult.calls.length > 0) {
-        const validationResult = validateCodeWithCache(code, parseResult.calls, schema);
+        const validationResult = validateCodeWithCache(code, parseResult.calls, schema, variableTypes);
 
         // Add validation errors
         for (const error of validationResult.errors) {
@@ -249,7 +257,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     });
   }, []);
 
-  const trpcLinterExtension = React.useMemo(() => createTrpcLinter(schema), [schema, createTrpcLinter]);
+  const trpcLinterExtension = React.useMemo(() => createTrpcLinter(schema, variables), [schema, variables, createTrpcLinter]);
   const formatSchemaForInfo = (schema: any): string => {
     if (!schema) return '';
 
@@ -441,6 +449,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           const inputSchema = procedureDef.inputSchema;
 
           // If the schema is an object, suggest the properties
+          // Build variable completions for use inside arguments
+          const argVariableOptions = variables
+            .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
+            .map(v => ({
+              label: v.key.trim(),
+              type: 'constant',
+              info: `Variable (${resolveVariableType(v.value)}): ${v.value || '(empty)'}`,
+              boost: -1,
+            }));
+
           if (inputSchema.type === 'object' && inputSchema.properties) {
             // Use the full document to detect braces and used keys,
             // not just the text before cursor
@@ -465,7 +483,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                       });
                     },
                     info: 'Add argument object'
-                  }
+                  },
+                  ...argVariableOptions,
                 ]
               };
             } else {
@@ -520,7 +539,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
                   return {
                     label: key,
-                    type: isRequired ? 'property' : 'variable',
+                    type: isRequired ? 'property' : 'text',
                     apply,
                     info: () => createPropertyInfoNode(key, type, isRequired, propSchema.description),
                   };
@@ -528,9 +547,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
               return {
                 from,
-                options
+                options: [...options, ...argVariableOptions],
               };
             }
+          } else if (argVariableOptions.length > 0) {
+            // Non-object schema (string, number, etc.) — suggest variables as argument
+            const from = word ? word.from : context.pos;
+            return { from, options: argVariableOptions };
           }
         }
       }
@@ -552,24 +575,41 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       };
     }
 
+    // Add variable completions
+    const variableOptions = (variables ?? [])
+      .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
+      .map(v => ({
+        label: v.key.trim(),
+        type: 'constant',
+        info: `Variable (${resolveVariableType(v.value)}): ${v.value || '(empty)'}`,
+      }));
+
     if (text.startsWith('trpc') || context.explicit) {
       return {
         from: word.from,
         options: [
-          { label: 'trpc', type: 'text', apply: 'trpc.', info: 'Access tRPC properties' }
+          { label: 'trpc', type: 'text', apply: 'trpc.', info: 'Access tRPC properties' },
+          ...variableOptions,
         ]
+      };
+    }
+
+    if (variableOptions.length > 0 && word && word.from < word.to) {
+      return {
+        from: word.from,
+        options: variableOptions,
       };
     }
 
     return null;
   };
 
-  const trpcAutocompleteExtension = autocompletion({
+  const trpcAutocompleteExtension = React.useMemo(() => autocompletion({
     override: [createTRPCCompletions],
     activateOnTyping: true,
     defaultKeymap: true,
     maxRenderedOptions: 100,
-  });
+  }), [schema, variables]);
 
   const dotTriggerExtension = EditorView.updateListener.of((update) => {
     if (!update.docChanged) return;
@@ -633,7 +673,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             button.className = "play-button";
             button.style.fontSize = "10px";
             button.style.border = "none";
-            button.style.backgroundColor = t.colors.accent.play;
+            button.style.backgroundColor = theme.colors.accent.play;
             button.style.color = "white";
             button.style.borderRadius = "50%";
             button.style.width = "18px";
@@ -663,7 +703,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} />
+      <EditorToolbar editorRef={editorRef} onVariablesClick={onVariablesClick} />
       <CodeMirror
         ref={editorRef}
         value={value}

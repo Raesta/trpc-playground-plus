@@ -6,6 +6,7 @@ import { theme as t } from '../theme';
 
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
+  onVariablesClick?: () => void;
   children?: React.ReactNode;
 }
 
@@ -13,7 +14,7 @@ const styles: Record<string, React.CSSProperties> = {
   toolbar: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: '4px',
     padding: '4px 8px',
     backgroundColor: t.colors.bg.primary,
@@ -60,7 +61,7 @@ const ToolbarButton: React.FC<{
   </button>
 );
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, children }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onVariablesClick, children }) => {
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
 
   const handleFoldAll = useCallback(() => {
@@ -95,19 +96,28 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, childre
 
   return (
     <div style={styles.toolbar}>
-      <ToolbarButton title="Fold all" onClick={handleFoldAll}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="4 14 12 6 20 14" />
-          <polyline points="4 22 12 14 20 22" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton title="Unfold all" onClick={handleUnfoldAll}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="4 6 12 14 20 6" />
-          <polyline points="4 14 12 22 20 14" />
-        </svg>
-      </ToolbarButton>
-      {children}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onVariablesClick && (
+          <ToolbarButton title="Variables" onClick={onVariablesClick}>
+            <span>Variables</span>
+          </ToolbarButton>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <ToolbarButton title="Fold all" onClick={handleFoldAll}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 14 12 6 20 14" />
+            <polyline points="4 22 12 14 20 22" />
+          </svg>
+        </ToolbarButton>
+        <ToolbarButton title="Unfold all" onClick={handleUnfoldAll}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 6 12 14 20 6" />
+            <polyline points="4 14 12 22 20 14" />
+          </svg>
+        </ToolbarButton>
+        {children}
+      </div>
     </div>
   );
 };

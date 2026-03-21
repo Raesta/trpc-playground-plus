@@ -3,8 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
-import { Tab } from './types'
+import { Tab, Variable } from './types'
 import Headers from './components/Headers'
+import Variables from './components/Variables'
 import { theme as t } from './theme'
 import { loadSettings, saveSettings } from './settings'
 
@@ -29,6 +30,8 @@ const Playground = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [headersOpen, setHeadersOpen] = useState(false);
   const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
+  const [variablesOpen, setVariablesOpen] = useState(false);
+  const [variables, setVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
 
   const handleSplitChange = useCallback((pct: number) => {
@@ -36,19 +39,25 @@ const Playground = () => {
     saveSettings({ splitPosition: pct });
   }, []);
 
-  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
+  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>, updatedVariables: Variable[]) => {
     localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
     localStorage.setItem('trpc-playground-headers', JSON.stringify(updatedHeaders));
+    localStorage.setItem('trpc-playground-variables', JSON.stringify(updatedVariables));
   };
 
   const handleUpdateTabs = (newTabs: Tab[]) => {
     setTabs(newTabs);
-    saveDataToLocalStorage(newTabs, headers);
+    saveDataToLocalStorage(newTabs, headers, variables);
   };
 
   const handleUpdateHeaders = (newHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
     setHeaders(newHeaders);
-    saveDataToLocalStorage(tabs, newHeaders);
+    saveDataToLocalStorage(tabs, newHeaders, variables);
+  };
+
+  const handleUpdateVariables = (newVariables: Variable[]) => {
+    setVariables(newVariables);
+    saveDataToLocalStorage(tabs, headers, newVariables);
   };
 
   useEffect(() => {
@@ -60,6 +69,7 @@ const Playground = () => {
 
         const savedTabs = localStorage.getItem('trpc-playground-tabs');
         const savedHeaders = localStorage.getItem('trpc-playground-headers');
+        const savedVariables = localStorage.getItem('trpc-playground-variables');
 
         if (savedTabs) {
           setTabs(JSON.parse(savedTabs));
@@ -71,6 +81,10 @@ const Playground = () => {
           setHeaders(JSON.parse(savedHeaders));
         } else {
           setHeaders(defaultHeaders);
+        }
+
+        if (savedVariables) {
+          setVariables(JSON.parse(savedVariables));
         }
       })
       .catch(err => console.error('Error loading configuration:', err));
@@ -99,7 +113,17 @@ const Playground = () => {
     const trpcClient = createDynamicTRPCClient({ trpcUrl: config.trpcEndpoint, transformer: config.transformer, headers: headersObject });
 
     try {
-      const executeFunction = new Function('trpc', `
+      const varNames: string[] = [];
+      const varValues: any[] = [];
+      variables.forEach(v => {
+        if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim())) {
+          varNames.push(v.key.trim());
+          try { varValues.push(JSON.parse(v.value)); }
+          catch { varValues.push(v.value); }
+        }
+      });
+
+      const executeFunction = new Function('trpc', ...varNames, `
         return (async () => {
           try {
             return await ${specificCode};
@@ -108,7 +132,7 @@ const Playground = () => {
           }
         })();
       `);
-      const result = await executeFunction(trpcClient);
+      const result = await executeFunction(trpcClient, ...varValues);
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
@@ -154,6 +178,11 @@ const Playground = () => {
             localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
           }
 
+          if (importedData.variables && Array.isArray(importedData.variables) && importedData.variables.length > 0) {
+            setVariables(importedData.variables);
+            localStorage.setItem('trpc-playground-variables', JSON.stringify(importedData.variables));
+          }
+
           if (importedData.settings && typeof importedData.settings === 'object') {
             saveSettings(importedData.settings);
             const merged = loadSettings();
@@ -187,13 +216,14 @@ const Playground = () => {
   return (
     <>
       <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
+      <Variables variables={variables} setVariables={handleUpdateVariables} open={variablesOpen} setOpen={setVariablesOpen} />
       <div style={{ padding: 10, fontFamily: t.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
             Connected to : <code>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} />
+            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} variables={variables} />
             <button
               onClick={importStructure}
               style={btnStyle}
@@ -229,6 +259,8 @@ const Playground = () => {
             isLoading={isLoading}
             splitPosition={splitPosition}
             onSplitChange={handleSplitChange}
+            variables={variables}
+            onVariablesClick={() => setVariablesOpen(!variablesOpen)}
           />
         </div>
       </div>

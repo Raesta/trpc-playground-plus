@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { CodeEditor } from './CodeEditor';
 import { Tabs } from './Tabs';
-import { RouterSchema, Tab } from '../types';
+import { RouterSchema, Tab, Variable } from '../types';
 import { JsonViewer } from './JsonViewer';
 import { theme as t } from '../theme';
 
@@ -17,6 +17,8 @@ interface TabCodeEditorProps {
   isLoading?: boolean;
   splitPosition: number;
   onSplitChange: (pct: number) => void;
+  variables?: Variable[];
+  onVariablesClick?: () => void;
 }
 
 const DIVIDER_HIT = 16;
@@ -95,6 +97,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   isLoading,
   splitPosition,
   onSplitChange,
+  variables,
+  onVariablesClick,
 }) => {
   useEffect(() => {
     if (tabs.length === 0) {
@@ -230,6 +234,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               onChange={handleCodeChange}
               schema={schema}
               onPlayRequest={onPlayRequest}
+              variables={variables}
+              onVariablesClick={onVariablesClick}
             />
           )}
         </div>
