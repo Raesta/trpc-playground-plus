@@ -36,25 +36,40 @@ const styles: Record<string, React.CSSProperties> = {
     transition: `all ${t.transition.fast}`,
     lineHeight: 1,
   },
+  pill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'none',
+    border: `1px solid ${t.colors.border.primary}`,
+    borderRadius: t.radius.sm,
+    color: t.colors.text.secondary,
+    fontSize: '13px',
+    padding: '3px 10px',
+    cursor: 'pointer',
+    transition: `all ${t.transition.fast}`,
+    lineHeight: 1,
+  },
 };
 
 const ToolbarButton: React.FC<{
   title: string;
   onClick: () => void;
+  variant?: 'icon' | 'pill';
   children: React.ReactNode;
-}> = ({ title, onClick, children }) => (
+}> = ({ title, onClick, variant = 'icon', children }) => (
   <button
     title={title}
     onClick={onClick}
-    style={styles.btn}
+    style={variant === 'pill' ? styles.pill : styles.btn}
     onMouseOver={(e) => {
       e.currentTarget.style.backgroundColor = t.colors.bg.hover;
-      e.currentTarget.style.borderColor = t.colors.border.primary;
+      e.currentTarget.style.borderColor = t.colors.border.secondary;
       e.currentTarget.style.color = t.colors.text.primary;
     }}
     onMouseOut={(e) => {
       e.currentTarget.style.backgroundColor = 'transparent';
-      e.currentTarget.style.borderColor = 'transparent';
+      e.currentTarget.style.borderColor = variant === 'pill' ? t.colors.border.primary : 'transparent';
       e.currentTarget.style.color = t.colors.text.secondary;
     }}
   >
@@ -98,8 +113,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onVaria
   return (
     <div style={styles.toolbar}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        {onHeadersClick && <ToolbarButton title="Headers" onClick={onHeadersClick}>Headers</ToolbarButton>}
         {onVariablesClick && <ToolbarButton title="Variables" onClick={onVariablesClick}>Variables</ToolbarButton>}
+        {onHeadersClick && <ToolbarButton title="Headers" onClick={onHeadersClick}>Headers</ToolbarButton>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <ToolbarButton title="Fold all" onClick={handleFoldAll}>
