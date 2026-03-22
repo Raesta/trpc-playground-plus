@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
@@ -9,7 +9,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { linter, Diagnostic } from '@codemirror/lint';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { validateCodeWithCache, resolveVariableType } from '../utils/zod-validator';
-import { editorThemeExtension } from '../editorTheme';
+import { createEditorTheme } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
 
 interface CodeEditorProps {
@@ -20,6 +20,7 @@ interface CodeEditorProps {
   variables?: Variable[];
   onVariablesClick?: () => void;
   onHeadersClick?: () => void;
+  fontSize?: number;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -202,8 +203,9 @@ const autocompleteTheme = EditorView.theme({
   },
 });
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick, onHeadersClick }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick, onHeadersClick, fontSize = 15 }) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+  const editorTheme = useMemo(() => createEditorTheme(fontSize), [fontSize]);
 
   const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
     const variableTypes = new Map(
@@ -718,7 +720,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         theme={vscodeDark}
         extensions={[
           javascript({ typescript: true }),
-          editorThemeExtension,
+          editorTheme,
           trpcAutocompleteExtension,
           autocompleteTheme,
           dotTriggerExtension,

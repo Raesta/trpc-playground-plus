@@ -53,4 +53,5 @@ export interface Variable {
 
 export interface PlaygroundSettings {
   splitPosition: number;
+  fontSize: number;
 }

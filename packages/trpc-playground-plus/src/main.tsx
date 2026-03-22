@@ -6,6 +6,7 @@ import { ExportButton } from './components/ExportButton'
 import { Tab, Variable } from './types'
 import Headers from './components/Headers'
 import Variables from './components/Variables'
+import Settings from './components/Settings'
 import { theme as t } from './theme'
 import { loadSettings, saveSettings } from './settings'
 
@@ -33,10 +34,19 @@ const Playground = () => {
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [variables, setVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
+  const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleSplitChange = useCallback((pct: number) => {
     setSplitPosition(pct);
     saveSettings({ splitPosition: pct });
+  }, []);
+
+  const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number }>) => {
+    if (partial.fontSize !== undefined) {
+      setFontSize(partial.fontSize);
+    }
+    saveSettings(partial);
   }, []);
 
   const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>, updatedVariables: Variable[]) => {
@@ -187,6 +197,7 @@ const Playground = () => {
             saveSettings(importedData.settings);
             const merged = loadSettings();
             setSplitPosition(merged.splitPosition);
+            setFontSize(merged.fontSize);
           }
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
@@ -217,6 +228,7 @@ const Playground = () => {
     <>
       <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
       <Variables variables={variables} setVariables={handleUpdateVariables} open={variablesOpen} setOpen={setVariablesOpen} />
+      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize }} onSettingsChange={handleSettingsChange} />
       <div style={{ padding: 10, fontFamily: t.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
@@ -237,6 +249,17 @@ const Playground = () => {
               </svg>
               Import
             </button>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              style={btnStyle}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -254,6 +277,7 @@ const Playground = () => {
             variables={variables}
             onVariablesClick={() => setVariablesOpen(!variablesOpen)}
             onHeadersClick={() => setHeadersOpen(!headersOpen)}
+            fontSize={fontSize}
           />
         </div>
       </div>

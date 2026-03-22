@@ -20,6 +20,7 @@ interface TabCodeEditorProps {
   variables?: Variable[];
   onVariablesClick?: () => void;
   onHeadersClick?: () => void;
+  fontSize?: number;
 }
 
 const DIVIDER_HIT = 16;
@@ -101,6 +102,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   variables,
   onVariablesClick,
   onHeadersClick,
+  fontSize,
 }) => {
   useEffect(() => {
     if (tabs.length === 0) {
@@ -239,6 +241,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               variables={variables}
               onVariablesClick={onVariablesClick}
               onHeadersClick={onHeadersClick}
+              fontSize={fontSize}
             />
           )}
         </div>

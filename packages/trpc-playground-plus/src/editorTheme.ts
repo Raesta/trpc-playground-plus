@@ -1,28 +1,29 @@
 import { EditorView } from '@codemirror/view';
-import { theme as t } from './theme';
+import { theme } from './theme';
 import { Extension } from '@codemirror/state';
 
-export const editorThemeExtension: Extension = EditorView.theme({
+export function createEditorTheme(fontSize = 15): Extension {
+  return EditorView.theme({
   '&': {
-    backgroundColor: `${t.colors.bg.root} !important`,
-    color: t.colors.text.primary,
+    backgroundColor: `${theme.colors.bg.root} !important`,
+    color: theme.colors.text.primary,
   },
   '.cm-content': {
-    caretColor: t.colors.accent.primary,
-    fontFamily: t.font.mono,
-    fontSize: t.font.size.base,
+    caretColor: theme.colors.accent.primary,
+    fontFamily: theme.font.mono,
+    fontSize: `${fontSize}px`,
   },
   '.cm-cursor, .cm-dropCursor': {
-    borderLeftColor: `${t.colors.accent.primary} !important`,
+    borderLeftColor: `${theme.colors.accent.primary} !important`,
   },
   '.cm-gutters': {
-    backgroundColor: `${t.colors.bg.root} !important`,
-    color: t.colors.text.muted,
-    borderRight: `1px solid ${t.colors.border.primary}`,
+    backgroundColor: `${theme.colors.bg.root} !important`,
+    color: theme.colors.text.muted,
+    borderRight: `1px solid ${theme.colors.border.primary}`,
   },
   '.cm-activeLineGutter': {
-    backgroundColor: `${t.colors.bg.hover} !important`,
-    color: `${t.colors.text.secondary} !important`,
+    backgroundColor: `${theme.colors.bg.hover} !important`,
+    color: `${theme.colors.text.secondary} !important`,
   },
   '.cm-activeLine': {
     backgroundColor: 'rgba(22, 27, 34, 0.6) !important',
@@ -35,32 +36,35 @@ export const editorThemeExtension: Extension = EditorView.theme({
   },
   '.cm-matchingBracket': {
     backgroundColor: 'rgba(56, 139, 253, 0.25) !important',
-    outline: `1px solid ${t.colors.border.secondary}`,
+    outline: `1px solid ${theme.colors.border.secondary}`,
   },
   '.cm-panels': {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
+    backgroundColor: theme.colors.bg.primary,
+    color: theme.colors.text.primary,
   },
   '.cm-foldPlaceholder': {
-    backgroundColor: t.colors.bg.hover,
-    border: `1px solid ${t.colors.border.primary}`,
-    color: t.colors.text.secondary,
+    backgroundColor: theme.colors.bg.hover,
+    border: `1px solid ${theme.colors.border.primary}`,
+    color: theme.colors.text.secondary,
   },
   '.cm-tooltip': {
-    backgroundColor: `${t.colors.bg.secondary} !important`,
-    border: `1px solid ${t.colors.border.primary} !important`,
-    borderRadius: `${t.radius.md} !important`,
+    backgroundColor: `${theme.colors.bg.secondary} !important`,
+    border: `1px solid ${theme.colors.border.primary} !important`,
+    borderRadius: `${theme.radius.md} !important`,
   },
   '.cm-lineNumbers .cm-gutterElement': {
     minWidth: '3ch',
     padding: '0 8px 0 4px',
   },
   '.cm-foldGutter .cm-gutterElement span': {
-    fontSize: `${t.font.size.base} !important`,
+    fontSize: `${theme.font.size.base} !important`,
     lineHeight: 'inherit',
     verticalAlign: 'middle',
   },
   '.cm-scroller': {
-    fontFamily: t.font.mono,
+    fontFamily: theme.font.mono,
   },
 });
+}
+
+export const editorThemeExtension: Extension = createEditorTheme();
