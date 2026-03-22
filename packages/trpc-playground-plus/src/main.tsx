@@ -237,14 +237,6 @@ const Playground = () => {
               </svg>
               Import
             </button>
-            <button
-              onClick={() => setHeadersOpen(!headersOpen)}
-              style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
-            >
-              Headers
-            </button>
           </div>
         </div>
 
@@ -261,6 +253,7 @@ const Playground = () => {
             onSplitChange={handleSplitChange}
             variables={variables}
             onVariablesClick={() => setVariablesOpen(!variablesOpen)}
+            onHeadersClick={() => setHeadersOpen(!headersOpen)}
           />
         </div>
       </div>

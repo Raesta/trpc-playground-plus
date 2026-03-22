@@ -19,6 +19,7 @@ interface CodeEditorProps {
   onPlayRequest?: (code: string) => Promise<void>;
   variables?: Variable[];
   onVariablesClick?: () => void;
+  onHeadersClick?: () => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -201,7 +202,7 @@ const autocompleteTheme = EditorView.theme({
   },
 });
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick, onHeadersClick }) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
 
   const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
@@ -710,7 +711,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} onVariablesClick={onVariablesClick} />
+      <EditorToolbar editorRef={editorRef} onVariablesClick={onVariablesClick} onHeadersClick={onHeadersClick} />
       <CodeMirror
         ref={editorRef}
         value={value}
