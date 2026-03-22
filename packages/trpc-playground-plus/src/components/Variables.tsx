@@ -135,6 +135,15 @@ const Variables = ({ open, setOpen, variables, setVariables }: VariablesProps) =
               </button>
             </div>
 
+            <p style={{
+              color: t.colors.text.muted,
+              fontSize: t.font.size.xs,
+              margin: '0 0 12px',
+              lineHeight: 1.5,
+            }}>
+              Define variables to reuse in your queries. Use a valid JS name and a JSON value, then reference it directly in the editor — e.g. <code style={{ color: t.colors.text.secondary }}>trpc.user.query(myVar)</code>
+            </p>
+
             {variables.map((variable, index) => {
               const error = isInvalidName(variable.key);
               return (
