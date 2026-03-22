@@ -3,8 +3,9 @@ import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
 import { RouterSchema, Variable } from '../types';
-import { Decoration, EditorView, WidgetType } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { Decoration, EditorView, WidgetType, GutterMarker, gutter, ViewUpdate } from '@codemirror/view';
+import { RangeSet, RangeSetBuilder } from '@codemirror/state';
+import { foldGutter } from '@codemirror/language';
 import { javascript } from "@codemirror/lang-javascript";
 import { linter, Diagnostic } from '@codemirror/lint';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
@@ -668,47 +669,73 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     return calls;
   };
 
-  const playButtonExtension = EditorView.decorations.compute(["doc"], state => {
-    const builder = new RangeSetBuilder<Decoration>();
-    const text = state.doc.toString();
+  // Cache trpc call lines: Map<lineFrom, callCode>
+  let cachedText = '';
+  let cachedCallLines = new Map<number, string>();
+
+  function getCallLines(text: string, doc: any): Map<number, string> {
+    if (text === cachedText) return cachedCallLines;
+    cachedText = text;
+    cachedCallLines = new Map();
     const calls = findTrpcCalls(text);
-
     for (const call of calls) {
-      const line = state.doc.lineAt(call.start);
-      const widget = Decoration.widget({
-        widget: new class extends WidgetType {
-          toDOM() {
-            const button = document.createElement("button");
-            button.innerHTML = "▶";
-            button.className = "play-button";
-            button.style.fontSize = "10px";
-            button.style.border = "none";
-            button.style.backgroundColor = theme.colors.accent.play;
-            button.style.color = "white";
-            button.style.borderRadius = "50%";
-            button.style.width = "18px";
-            button.style.height = "18px";
-            button.style.cursor = "pointer";
-            button.style.marginRight = "4px";
-            button.style.padding = "0px";
-            button.title = "Execute this call";
-
-            button.onclick = () => {
-              if (onPlayRequest) {
-                onPlayRequest(call.code);
-              }
-            };
-
-            return button;
-          }
-        },
-        side: -1
-      });
-
-      builder.add(line.from, line.from, widget);
+      const line = doc.lineAt(call.start);
+      if (!cachedCallLines.has(line.from)) {
+        cachedCallLines.set(line.from, call.code);
+      }
     }
+    return cachedCallLines;
+  }
 
-    return builder.finish();
+  class LineNumberMarker extends GutterMarker {
+    constructor(private num: string) { super(); }
+    toDOM() {
+      const span = document.createElement("span");
+      span.textContent = this.num;
+      return span;
+    }
+  }
+
+  class PlayButtonMarker extends GutterMarker {
+    constructor(private callCode: string) { super(); }
+    toDOM() {
+      const btn = document.createElement("button");
+      btn.innerHTML = "▶";
+      btn.style.cssText = `
+        font-size:9px; border:none; background:${theme.colors.accent.play};
+        color:white; border-radius:50%; width:16px; height:16px;
+        cursor:pointer; padding:0; display:inline-flex; align-items:center;
+        justify-content:center; line-height:1;
+      `;
+      btn.title = "Execute this call";
+      const code = this.callCode;
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onPlayRequest) onPlayRequest(code);
+      };
+      return btn;
+    }
+  }
+
+  const playLineNumbersExtension = gutter({
+    class: "cm-lineNumbers",
+    lineMarker(view, line) {
+      const text = view.state.doc.toString();
+      const callLines = getCallLines(text, view.state.doc);
+      const lineNum = view.state.doc.lineAt(line.from).number;
+      if (callLines.has(line.from)) {
+        return new PlayButtonMarker(callLines.get(line.from)!);
+      }
+      return new LineNumberMarker(String(lineNum));
+    },
+    lineMarkerChange(update: ViewUpdate) {
+      return update.docChanged;
+    },
+    initialSpacer(view) {
+      const lines = view.state.doc.lines;
+      return new LineNumberMarker(String(lines));
+    },
   });
 
   return (
@@ -718,14 +745,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         ref={editorRef}
         value={value}
         theme={vscodeDark}
+        basicSetup={{ lineNumbers: false, foldGutter: false }}
         extensions={[
           javascript({ typescript: true }),
           editorTheme,
+          playLineNumbersExtension,
+          foldGutter(),
           trpcAutocompleteExtension,
           autocompleteTheme,
           dotTriggerExtension,
           trpcLinterExtension,
-          playButtonExtension
         ]}
         onChange={onChange}
         style={styles.editor}
