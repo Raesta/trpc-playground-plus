@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { theme as t } from "../theme";
 import { PlaygroundSettings } from "../types";
 
@@ -11,6 +11,35 @@ interface SettingsProps {
 
 const FONT_SIZE_MIN = 10;
 const FONT_SIZE_MAX = 24;
+
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{
+    color: t.colors.text.muted,
+    fontSize: t.font.size.xs,
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    padding: '8px 0 6px',
+    borderBottom: `1px solid ${t.colors.border.primary}`,
+    marginBottom: '10px',
+  }}>
+    {children}
+  </div>
+);
+
+const SettingRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div style={{ marginBottom: '14px' }}>
+    <label style={{
+      display: 'block',
+      color: t.colors.text.secondary,
+      fontSize: t.font.size.xs,
+      marginBottom: '6px',
+    }}>
+      {label}
+    </label>
+    {children}
+  </div>
+);
 
 const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) => {
   const [mounted, setMounted] = useState(false);
@@ -88,15 +117,9 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
               </button>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                display: 'block',
-                color: t.colors.text.secondary,
-                fontSize: t.font.size.xs,
-                marginBottom: '6px',
-              }}>
-                Font size
-              </label>
+            <SectionTitle>Editor</SectionTitle>
+
+            <SettingRow label="Font size">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="range"
@@ -115,7 +138,7 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                   {settings.fontSize}px
                 </span>
               </div>
-            </div>
+            </SettingRow>
           </div>
         </>
       )}
