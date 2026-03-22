@@ -182,6 +182,7 @@ const Variables = ({ open, setOpen, variables, setVariables }: VariablesProps) =
                           boxSizing: 'border-box',
                           flex: 1,
                           opacity: 0.8,
+                          maxWidth: '100px',
                         }}>
                           {resolved.type}
                         </span>
