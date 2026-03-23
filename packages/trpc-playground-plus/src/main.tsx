@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
-import { Tab } from './types'
+import { Tab, Variable } from './types'
 import Headers from './components/Headers'
+import Variables from './components/Variables'
+import Settings from './components/Settings'
 import { theme as t } from './theme'
 import { loadSettings, saveSettings } from './settings'
 
@@ -29,26 +31,43 @@ const Playground = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [headersOpen, setHeadersOpen] = useState(false);
   const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
+  const [variablesOpen, setVariablesOpen] = useState(false);
+  const [variables, setVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
+  const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleSplitChange = useCallback((pct: number) => {
     setSplitPosition(pct);
     saveSettings({ splitPosition: pct });
   }, []);
 
-  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
+  const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number }>) => {
+    if (partial.fontSize !== undefined) {
+      setFontSize(partial.fontSize);
+    }
+    saveSettings(partial);
+  }, []);
+
+  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>, updatedVariables: Variable[]) => {
     localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
     localStorage.setItem('trpc-playground-headers', JSON.stringify(updatedHeaders));
+    localStorage.setItem('trpc-playground-variables', JSON.stringify(updatedVariables));
   };
 
   const handleUpdateTabs = (newTabs: Tab[]) => {
     setTabs(newTabs);
-    saveDataToLocalStorage(newTabs, headers);
+    saveDataToLocalStorage(newTabs, headers, variables);
   };
 
   const handleUpdateHeaders = (newHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
     setHeaders(newHeaders);
-    saveDataToLocalStorage(tabs, newHeaders);
+    saveDataToLocalStorage(tabs, newHeaders, variables);
+  };
+
+  const handleUpdateVariables = (newVariables: Variable[]) => {
+    setVariables(newVariables);
+    saveDataToLocalStorage(tabs, headers, newVariables);
   };
 
   useEffect(() => {
@@ -60,6 +79,7 @@ const Playground = () => {
 
         const savedTabs = localStorage.getItem('trpc-playground-tabs');
         const savedHeaders = localStorage.getItem('trpc-playground-headers');
+        const savedVariables = localStorage.getItem('trpc-playground-variables');
 
         if (savedTabs) {
           setTabs(JSON.parse(savedTabs));
@@ -71,6 +91,10 @@ const Playground = () => {
           setHeaders(JSON.parse(savedHeaders));
         } else {
           setHeaders(defaultHeaders);
+        }
+
+        if (savedVariables) {
+          setVariables(JSON.parse(savedVariables));
         }
       })
       .catch(err => console.error('Error loading configuration:', err));
@@ -99,7 +123,17 @@ const Playground = () => {
     const trpcClient = createDynamicTRPCClient({ trpcUrl: config.trpcEndpoint, transformer: config.transformer, headers: headersObject });
 
     try {
-      const executeFunction = new Function('trpc', `
+      const varNames: string[] = [];
+      const varValues: any[] = [];
+      variables.forEach(v => {
+        if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim())) {
+          varNames.push(v.key.trim());
+          try { varValues.push(JSON.parse(v.value)); }
+          catch { varValues.push(v.value); }
+        }
+      });
+
+      const executeFunction = new Function('trpc', ...varNames, `
         return (async () => {
           try {
             return await ${specificCode};
@@ -108,7 +142,7 @@ const Playground = () => {
           }
         })();
       `);
-      const result = await executeFunction(trpcClient);
+      const result = await executeFunction(trpcClient, ...varValues);
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
@@ -154,10 +188,16 @@ const Playground = () => {
             localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
           }
 
+          if (importedData.variables && Array.isArray(importedData.variables) && importedData.variables.length > 0) {
+            setVariables(importedData.variables);
+            localStorage.setItem('trpc-playground-variables', JSON.stringify(importedData.variables));
+          }
+
           if (importedData.settings && typeof importedData.settings === 'object') {
             saveSettings(importedData.settings);
             const merged = loadSettings();
             setSplitPosition(merged.splitPosition);
+            setFontSize(merged.fontSize);
           }
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
@@ -187,13 +227,15 @@ const Playground = () => {
   return (
     <>
       <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
+      <Variables variables={variables} setVariables={handleUpdateVariables} open={variablesOpen} setOpen={setVariablesOpen} />
+      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize }} onSettingsChange={handleSettingsChange} />
       <div style={{ padding: 10, fontFamily: t.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
             Connected to : <code>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} />
+            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} variables={variables} />
             <button
               onClick={importStructure}
               style={btnStyle}
@@ -208,12 +250,15 @@ const Playground = () => {
               Import
             </button>
             <button
-              onClick={() => setHeadersOpen(!headersOpen)}
+              onClick={() => setSettingsOpen(!settingsOpen)}
               style={btnStyle}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
             >
-              Headers
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </button>
           </div>
         </div>
@@ -229,6 +274,10 @@ const Playground = () => {
             isLoading={isLoading}
             splitPosition={splitPosition}
             onSplitChange={handleSplitChange}
+            variables={variables}
+            onVariablesClick={() => setVariablesOpen(!variablesOpen)}
+            onHeadersClick={() => setHeadersOpen(!headersOpen)}
+            fontSize={fontSize}
           />
         </div>
       </div>

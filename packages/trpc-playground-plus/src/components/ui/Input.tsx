@@ -1,4 +1,4 @@
-import { theme as t } from '../../theme';
+import { theme } from '../../theme';
 
 interface InputProps {
   value: string;
@@ -9,15 +9,16 @@ interface InputProps {
 
 const styles: Record<string, React.CSSProperties> = {
   input: {
-    backgroundColor: t.colors.bg.root,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
+    flex: 1,
+    backgroundColor: theme.colors.bg.root,
+    color: theme.colors.text.primary,
+    border: `1px solid ${theme.colors.border.primary}`,
     padding: '0 8px',
     height: '30px',
-    borderRadius: t.radius.sm,
-    fontSize: t.font.size.md,
+    borderRadius: theme.radius.sm,
+    fontSize: theme.font.size.md,
     outline: 'none',
-    transition: `border-color ${t.transition.fast}`,
+    transition: `border-color ${theme.transition.fast}`,
   }
 }
 
@@ -30,11 +31,11 @@ const Input = ({ value, onChange, placeholder, type = 'text' }: InputProps) => {
       onChange={(e) => onChange(e.target.value)}
       style={styles.input}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = t.colors.accent.primary;
-        e.currentTarget.style.boxShadow = `0 0 0 2px ${t.colors.border.focus}`;
+        e.currentTarget.style.borderColor = theme.colors.accent.primary;
+        e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.border.focus}`;
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = t.colors.border.primary;
+        e.currentTarget.style.borderColor = theme.colors.border.primary;
         e.currentTarget.style.boxShadow = 'none';
       }}
     />

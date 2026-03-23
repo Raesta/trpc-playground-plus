@@ -4,6 +4,7 @@ const STORAGE_KEY = 'trpc-playground-settings';
 
 const DEFAULTS: PlaygroundSettings = {
   splitPosition: 50,
+  fontSize: 15,
 };
 
 export function loadSettings(): PlaygroundSettings {

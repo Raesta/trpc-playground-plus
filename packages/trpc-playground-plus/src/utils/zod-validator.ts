@@ -53,8 +53,40 @@ function getProcedureSchema(
   };
 }
 
-function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean; errors: any[] } {
+/** Resolve the JSON type of a variable value (same logic as Variables.tsx resolveType) */
+export function resolveVariableType(value: string): string {
+  if (!value.trim()) return 'unknown';
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed === null) return 'null';
+    if (Array.isArray(parsed)) return 'array';
+    return typeof parsed; // 'string' | 'number' | 'boolean' | 'object'
+  } catch {
+    return 'string'; // fallback: raw string
+  }
+}
+
+function validateWithJsonSchema(data: any, jsonSchema: any, variableTypes: Map<string, string> = new Map()): { success: boolean; errors: any[] } {
   if (!jsonSchema) {
+    return { success: true, errors: [] };
+  }
+
+  // Check if data is a known variable — validate its type against the schema
+  if (typeof data === 'string' && variableTypes.has(data)) {
+    const varType = variableTypes.get(data)!;
+    const expectedType = jsonSchema.type;
+    if (expectedType && varType !== 'unknown' && varType !== expectedType) {
+      return {
+        success: false,
+        errors: [{
+          code: 'invalid_type',
+          message: `Variable "${data}" is ${varType}, but expected ${expectedType}`,
+          path: [],
+          expected: expectedType,
+          received: varType
+        }]
+      };
+    }
     return { success: true, errors: [] };
   }
 
@@ -123,14 +155,28 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
 
           if (isJsExpr) {
             const jsExpr = propValue.substring('__JS_EXPR__'.length);
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected ${propType}, but received JavaScript expression`,
-              path: [propName],
-              expected: propType,
-              received: 'expression',
-              jsExpression: jsExpr
-            });
+            if (variableTypes.has(jsExpr)) {
+              // Known variable — check type compatibility
+              const varType = variableTypes.get(jsExpr)!;
+              if (propType && varType !== 'unknown' && varType !== propType) {
+                errors.push({
+                  code: 'invalid_type',
+                  message: `Variable "${jsExpr}" is ${varType}, but expected ${propType}`,
+                  path: [propName],
+                  expected: propType,
+                  received: varType
+                });
+              }
+            } else {
+              errors.push({
+                code: 'invalid_type',
+                message: `Expected ${propType}, but received JavaScript expression`,
+                path: [propName],
+                expected: propType,
+                received: 'expression',
+                jsExpression: jsExpr
+              });
+            }
           } else if (propType === 'string' && typeof propValue !== 'string') {
             errors.push({
               code: 'invalid_type',
@@ -304,7 +350,8 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
 
 export function validateTrpcCall(
   call: TrpcCall,
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map()
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
@@ -332,7 +379,7 @@ export function validateTrpcCall(
 
   // Validate input arguments with JSON Schema
   if (procedureSchema.inputSchema) {
-    const inputValidation = validateWithJsonSchema(call.args, procedureSchema.inputSchema);
+    const inputValidation = validateWithJsonSchema(call.args, procedureSchema.inputSchema, variableTypes);
 
     if (!inputValidation.success) {
       for (const jsonSchemaError of inputValidation.errors) {
@@ -359,13 +406,14 @@ export function validateTrpcCall(
 
 export function validateCode(
   calls: TrpcCall[],
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map()
 ): ValidationResult {
   const allErrors: ValidationError[] = [];
   const allWarnings: ValidationError[] = [];
 
   for (const call of calls) {
-    const result = validateTrpcCall(call, schema);
+    const result = validateTrpcCall(call, schema, variableTypes);
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
   }
@@ -383,9 +431,11 @@ const validationCache = new Map<string, ValidationResult>();
 export function validateCodeWithCache(
   code: string,
   calls: TrpcCall[],
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map()
 ): ValidationResult {
-  const cacheKey = `${code}-${JSON.stringify(schema)}`;
+  const varKey = [...variableTypes.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join(',');
+  const cacheKey = `${code}-${JSON.stringify(schema)}-${varKey}`;
 
   if (validationCache.has(cacheKey)) {
     const cachedResult = validationCache.get(cacheKey);
@@ -394,7 +444,7 @@ export function validateCodeWithCache(
     }
   }
 
-  const result = validateCode(calls, schema);
+  const result = validateCode(calls, schema, variableTypes);
   validationCache.set(cacheKey, result);
 
   // Limit the size of the cache
