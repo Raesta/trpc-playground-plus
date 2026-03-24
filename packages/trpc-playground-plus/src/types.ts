@@ -37,6 +37,8 @@ export interface Tab {
   title: string;
   content: string;
   isActive?: boolean;
+  variables: Variable[];
+  headers: Header[];
 }
 
 export interface Header {

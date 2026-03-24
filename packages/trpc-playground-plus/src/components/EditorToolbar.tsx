@@ -6,8 +6,7 @@ import { theme as t } from '../theme';
 
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
-  onVariablesClick?: () => void;
-  onHeadersClick?: () => void;
+  onTabDrawerClick?: () => void;
   children?: React.ReactNode;
 }
 
@@ -77,7 +76,7 @@ const ToolbarButton: React.FC<{
   </button>
 );
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onVariablesClick, onHeadersClick, children }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, children }) => {
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
 
   const handleFoldAll = useCallback(() => {
@@ -113,8 +112,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onVaria
   return (
     <div style={styles.toolbar}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        {onVariablesClick && <ToolbarButton title="Variables" onClick={onVariablesClick}>Variables</ToolbarButton>}
-        {onHeadersClick && <ToolbarButton title="Headers" onClick={onHeadersClick}>Headers</ToolbarButton>}
+        {onTabDrawerClick && <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick}>Headers & Variables</ToolbarButton>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <ToolbarButton title="Fold all" onClick={handleFoldAll}>

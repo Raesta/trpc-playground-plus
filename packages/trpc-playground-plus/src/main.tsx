@@ -3,9 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
-import { Tab, Variable } from './types'
-import Headers from './components/Headers'
-import Variables from './components/Variables'
+import { Tab, Variable, Header } from './types'
+import VarsHeadersDrawer from './components/VarsHeadersDrawer'
 import Settings from './components/Settings'
 import { theme as t } from './theme'
 import { loadSettings, saveSettings } from './settings'
@@ -24,15 +23,28 @@ interface PlaygroundConfig {
   schema: RouterSchema;
 }
 
+function mergeByKey<T extends { key: string }>(globals: T[], locals: T[]): T[] {
+  const localKeys = new Set(locals.filter(l => l.key.trim()).map(l => l.key.trim()));
+  return [...globals.filter(g => g.key.trim() && !localKeys.has(g.key.trim())), ...locals];
+}
+
+function ensureTabFields(tab: any): Tab {
+  return {
+    ...tab,
+    variables: Array.isArray(tab.variables) ? tab.variables : [],
+    headers: Array.isArray(tab.headers) ? tab.headers : [],
+  };
+}
+
 const Playground = () => {
   const [config, setConfig] = useState<PlaygroundConfig | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [headersOpen, setHeadersOpen] = useState(false);
-  const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
-  const [variablesOpen, setVariablesOpen] = useState(false);
-  const [variables, setVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
+  const [globalDrawerOpen, setGlobalDrawerOpen] = useState(false);
+  const [globalHeaders, setGlobalHeaders] = useState<Header[]>([{key: '', value: '', enabled: true}]);
+  const [globalVariables, setGlobalVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
+  const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -49,7 +61,7 @@ const Playground = () => {
     saveSettings(partial);
   }, []);
 
-  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>, updatedVariables: Variable[]) => {
+  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Header[], updatedVariables: Variable[]) => {
     localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
     localStorage.setItem('trpc-playground-headers', JSON.stringify(updatedHeaders));
     localStorage.setItem('trpc-playground-variables', JSON.stringify(updatedVariables));
@@ -57,17 +69,33 @@ const Playground = () => {
 
   const handleUpdateTabs = (newTabs: Tab[]) => {
     setTabs(newTabs);
-    saveDataToLocalStorage(newTabs, headers, variables);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
-  const handleUpdateHeaders = (newHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
-    setHeaders(newHeaders);
-    saveDataToLocalStorage(tabs, newHeaders, variables);
+  const handleUpdateGlobalHeaders = (newHeaders: Header[]) => {
+    setGlobalHeaders(newHeaders);
+    saveDataToLocalStorage(tabs, newHeaders, globalVariables);
   };
 
-  const handleUpdateVariables = (newVariables: Variable[]) => {
-    setVariables(newVariables);
-    saveDataToLocalStorage(tabs, headers, newVariables);
+  const handleUpdateGlobalVariables = (newVariables: Variable[]) => {
+    setGlobalVariables(newVariables);
+    saveDataToLocalStorage(tabs, globalHeaders, newVariables);
+  };
+
+  const handleUpdateActiveTabVariables = (newVariables: Variable[]) => {
+    const newTabs = tabs.map(tab =>
+      tab.isActive ? { ...tab, variables: newVariables } : tab
+    );
+    setTabs(newTabs);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
+  };
+
+  const handleUpdateActiveTabHeaders = (newHeaders: Header[]) => {
+    const newTabs = tabs.map(tab =>
+      tab.isActive ? { ...tab, headers: newHeaders } : tab
+    );
+    setTabs(newTabs);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
   useEffect(() => {
@@ -82,19 +110,20 @@ const Playground = () => {
         const savedVariables = localStorage.getItem('trpc-playground-variables');
 
         if (savedTabs) {
-          setTabs(JSON.parse(savedTabs));
+          const parsed = JSON.parse(savedTabs);
+          setTabs(parsed.map(ensureTabFields));
         } else {
-          setTabs(defaultTabs);
+          setTabs((defaultTabs || []).map(ensureTabFields));
         }
 
         if (savedHeaders) {
-          setHeaders(JSON.parse(savedHeaders));
+          setGlobalHeaders(JSON.parse(savedHeaders));
         } else {
-          setHeaders(defaultHeaders);
+          setGlobalHeaders(defaultHeaders);
         }
 
         if (savedVariables) {
-          setVariables(JSON.parse(savedVariables));
+          setGlobalVariables(JSON.parse(savedVariables));
         }
       })
       .catch(err => console.error('Error loading configuration:', err));
@@ -104,15 +133,17 @@ const Playground = () => {
     return <div>Loading playground...</div>;
   }
 
+  const activeTab = tabs.find(tab => tab.isActive);
+  const mergedVariables = mergeByKey(globalVariables, activeTab?.variables ?? []);
+  const mergedHeaders = mergeByKey(globalHeaders, activeTab?.headers ?? []);
+
   const getHeadersObject = () => {
     const result: Record<string, string> = {};
-
-    headers.forEach(h => {
+    mergedHeaders.forEach(h => {
       if (h.key.trim() && h.value.trim() && h.enabled) {
         result[h.key.trim()] = h.value.trim();
       }
     });
-
     return result;
   };
 
@@ -125,7 +156,7 @@ const Playground = () => {
     try {
       const varNames: string[] = [];
       const varValues: any[] = [];
-      variables.forEach(v => {
+      mergedVariables.forEach(v => {
         if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim())) {
           varNames.push(v.key.trim());
           try { varValues.push(JSON.parse(v.value)); }
@@ -168,12 +199,16 @@ const Playground = () => {
           const content = e.target?.result as string;
           const importedData = JSON.parse(content);
 
-          if (!importedData.tabs || !Array.isArray(importedData.tabs) || !importedData.headers || !Array.isArray(importedData.headers)) {
+          // Support both old format (variables/headers) and new format (globalVariables/globalHeaders)
+          const importedGlobalVariables = importedData.globalVariables || importedData.variables;
+          const importedGlobalHeaders = importedData.globalHeaders || importedData.headers;
+
+          if (!importedData.tabs || !Array.isArray(importedData.tabs)) {
             alert('Invalid file format');
             return;
           }
 
-          const importedTabs = importedData.tabs.map((tab: any, index: number) => ({
+          const importedTabs = importedData.tabs.map((tab: any, index: number) => ensureTabFields({
             ...tab,
             isActive: index === 0,
           }));
@@ -183,14 +218,14 @@ const Playground = () => {
             localStorage.setItem('trpc-playground-tabs', JSON.stringify(importedTabs));
           }
 
-          if (importedData.headers.length > 0) {
-            setHeaders(importedData.headers);
-            localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
+          if (importedGlobalHeaders && Array.isArray(importedGlobalHeaders) && importedGlobalHeaders.length > 0) {
+            setGlobalHeaders(importedGlobalHeaders);
+            localStorage.setItem('trpc-playground-headers', JSON.stringify(importedGlobalHeaders));
           }
 
-          if (importedData.variables && Array.isArray(importedData.variables) && importedData.variables.length > 0) {
-            setVariables(importedData.variables);
-            localStorage.setItem('trpc-playground-variables', JSON.stringify(importedData.variables));
+          if (importedGlobalVariables && Array.isArray(importedGlobalVariables) && importedGlobalVariables.length > 0) {
+            setGlobalVariables(importedGlobalVariables);
+            localStorage.setItem('trpc-playground-variables', JSON.stringify(importedGlobalVariables));
           }
 
           if (importedData.settings && typeof importedData.settings === 'object') {
@@ -226,8 +261,28 @@ const Playground = () => {
 
   return (
     <>
-      <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
-      <Variables variables={variables} setVariables={handleUpdateVariables} open={variablesOpen} setOpen={setVariablesOpen} />
+      <VarsHeadersDrawer
+        title="Global"
+        open={globalDrawerOpen}
+        setOpen={setGlobalDrawerOpen}
+        variables={globalVariables}
+        setVariables={handleUpdateGlobalVariables}
+        headers={globalHeaders}
+        setHeaders={handleUpdateGlobalHeaders}
+        side="right"
+      />
+      {activeTab && (
+        <VarsHeadersDrawer
+          title={`Tab: ${activeTab.title}`}
+          open={tabDrawerOpen}
+          setOpen={setTabDrawerOpen}
+          variables={activeTab.variables}
+          setVariables={handleUpdateActiveTabVariables}
+          headers={activeTab.headers}
+          setHeaders={handleUpdateActiveTabHeaders}
+          side="left"
+        />
+      )}
       <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize }} onSettingsChange={handleSettingsChange} />
       <div style={{ padding: 10, fontFamily: t.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -235,7 +290,7 @@ const Playground = () => {
             Connected to : <code>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} variables={variables} />
+            <ExportButton tabs={tabs} globalHeaders={globalHeaders} settings={loadSettings()} globalVariables={globalVariables} />
             <button
               onClick={importStructure}
               style={btnStyle}
@@ -248,6 +303,19 @@ const Playground = () => {
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
               Import
+            </button>
+            <button
+              onClick={() => setGlobalDrawerOpen(!globalDrawerOpen)}
+              style={btnStyle}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              Global
             </button>
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
@@ -274,9 +342,8 @@ const Playground = () => {
             isLoading={isLoading}
             splitPosition={splitPosition}
             onSplitChange={handleSplitChange}
-            variables={variables}
-            onVariablesClick={() => setVariablesOpen(!variablesOpen)}
-            onHeadersClick={() => setHeadersOpen(!headersOpen)}
+            mergedVariables={mergedVariables}
+            onTabDrawerClick={() => setTabDrawerOpen(!tabDrawerOpen)}
             fontSize={fontSize}
           />
         </div>

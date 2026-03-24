@@ -3,9 +3,9 @@ import { theme as t } from "../theme";
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
-  headers: Array<Header>;
+  globalHeaders: Array<Header>;
   settings: PlaygroundSettings;
-  variables: Array<Variable>;
+  globalVariables: Array<Variable>;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -24,13 +24,13 @@ const styles: Record<string, React.CSSProperties> = {
   }
 }
 
-export const ExportButton = ({ tabs, headers, settings, variables }: ExportButtonProps) => {
+export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }: ExportButtonProps) => {
   const exportStructure = () => {
     const exportData = {
       tabs,
-      headers,
+      globalHeaders,
       settings,
-      variables,
+      globalVariables,
       createdAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });

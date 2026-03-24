@@ -17,9 +17,8 @@ interface TabCodeEditorProps {
   isLoading?: boolean;
   splitPosition: number;
   onSplitChange: (pct: number) => void;
-  variables?: Variable[];
-  onVariablesClick?: () => void;
-  onHeadersClick?: () => void;
+  mergedVariables?: Variable[];
+  onTabDrawerClick?: () => void;
   fontSize?: number;
 }
 
@@ -99,9 +98,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   isLoading,
   splitPosition,
   onSplitChange,
-  variables,
-  onVariablesClick,
-  onHeadersClick,
+  mergedVariables,
+  onTabDrawerClick,
   fontSize,
 }) => {
   useEffect(() => {
@@ -110,7 +108,9 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         id: generateId(),
         title: 'Default tab',
         content: '// Exemple:\n// trpc.hello.query("monde")',
-        isActive: true
+        isActive: true,
+        variables: [],
+        headers: [],
       };
       onTabsChange([defaultTab]);
     } else if (!tabs.some(tab => tab.isActive)) {
@@ -152,7 +152,9 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
       id: generateId(),
       title: `Tab ${tabs.length + 1}`,
       content: '// Exemple:\n// trpc.hello.query("monde")',
-      isActive: true
+      isActive: true,
+      variables: [],
+      headers: [],
     };
 
     onTabsChange([...updatedTabs, newTab]);
@@ -238,9 +240,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               onChange={handleCodeChange}
               schema={schema}
               onPlayRequest={onPlayRequest}
-              variables={variables}
-              onVariablesClick={onVariablesClick}
-              onHeadersClick={onHeadersClick}
+              variables={mergedVariables}
+              onTabDrawerClick={onTabDrawerClick}
               fontSize={fontSize}
             />
           )}

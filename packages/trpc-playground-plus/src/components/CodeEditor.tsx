@@ -19,8 +19,7 @@ interface CodeEditorProps {
   schema: RouterSchema;
   onPlayRequest?: (code: string) => Promise<void>;
   variables?: Variable[];
-  onVariablesClick?: () => void;
-  onHeadersClick?: () => void;
+  onTabDrawerClick?: () => void;
   fontSize?: number;
 }
 
@@ -204,7 +203,7 @@ const autocompleteTheme = EditorView.theme({
   },
 });
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onVariablesClick, onHeadersClick, fontSize = 15 }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onTabDrawerClick, fontSize = 15 }) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const editorTheme = useMemo(() => createEditorTheme(fontSize), [fontSize]);
 
@@ -740,7 +739,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} onVariablesClick={onVariablesClick} onHeadersClick={onHeadersClick} />
+      <EditorToolbar editorRef={editorRef} onTabDrawerClick={onTabDrawerClick} />
       <CodeMirror
         ref={editorRef}
         value={value}
