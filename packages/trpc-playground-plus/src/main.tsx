@@ -23,9 +23,9 @@ interface PlaygroundConfig {
   schema: RouterSchema;
 }
 
-function mergeByKey<T extends { key: string }>(globals: T[], locals: T[]): T[] {
-  const localKeys = new Set(locals.filter(l => l.key.trim()).map(l => l.key.trim()));
-  return [...globals.filter(g => g.key.trim() && !localKeys.has(g.key.trim())), ...locals];
+function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): T[] {
+  const enabledLocalKeys = new Set(locals.filter(l => l.key.trim() && l.enabled).map(l => l.key.trim()));
+  return [...globals.filter(g => g.key.trim() && !enabledLocalKeys.has(g.key.trim())), ...locals];
 }
 
 function ensureTabFields(tab: any): Tab {
