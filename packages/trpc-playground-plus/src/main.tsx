@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
-import { Tab, Variable, Header } from './types'
+import { Tab, Variable, Header, VariableType } from './types'
 import VarsHeadersDrawer from './components/VarsHeadersDrawer'
 import Settings from './components/Settings'
 import { theme as t } from './theme'
@@ -23,15 +23,33 @@ interface PlaygroundConfig {
   schema: RouterSchema;
 }
 
+function coerceVariableValue(raw: string, type: VariableType): any {
+  switch (type) {
+    case 'string':  return raw;
+    case 'number':  { const n = Number(raw); return isNaN(n) ? 0 : n; }
+    case 'boolean': return raw === 'true' || raw === '1';
+    case 'null':    return null;
+    case 'object':
+    case 'array':
+    case 'json':
+      try { return JSON.parse(raw); }
+      catch { return type === 'array' ? [] : {}; }
+  }
+}
+
 function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): T[] {
   const enabledLocalKeys = new Set(locals.filter(l => l.key.trim() && l.enabled).map(l => l.key.trim()));
   return [...globals.filter(g => g.key.trim() && !enabledLocalKeys.has(g.key.trim())), ...locals];
 }
 
+function ensureVariableType(v: any): Variable {
+  return { ...v, type: v.type || 'string' };
+}
+
 function ensureTabFields(tab: any): Tab {
   return {
     ...tab,
-    variables: Array.isArray(tab.variables) ? tab.variables : [],
+    variables: Array.isArray(tab.variables) ? tab.variables.map(ensureVariableType) : [],
     headers: Array.isArray(tab.headers) ? tab.headers : [],
   };
 }
@@ -43,7 +61,7 @@ const Playground = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [globalDrawerOpen, setGlobalDrawerOpen] = useState(false);
   const [globalHeaders, setGlobalHeaders] = useState<Header[]>([{key: '', value: '', enabled: true}]);
-  const [globalVariables, setGlobalVariables] = useState<Variable[]>([{ key: '', value: '', enabled: true }]);
+  const [globalVariables, setGlobalVariables] = useState<Variable[]>([{ key: '', value: '', type: 'string', enabled: true }]);
   const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
@@ -123,7 +141,7 @@ const Playground = () => {
         }
 
         if (savedVariables) {
-          setGlobalVariables(JSON.parse(savedVariables));
+          setGlobalVariables(JSON.parse(savedVariables).map(ensureVariableType));
         }
       })
       .catch(err => console.error('Error loading configuration:', err));
@@ -159,8 +177,7 @@ const Playground = () => {
       mergedVariables.forEach(v => {
         if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim())) {
           varNames.push(v.key.trim());
-          try { varValues.push(JSON.parse(v.value)); }
-          catch { varValues.push(v.value); }
+          varValues.push(coerceVariableValue(v.value, v.type || 'string'));
         }
       });
 
@@ -224,8 +241,9 @@ const Playground = () => {
           }
 
           if (importedGlobalVariables && Array.isArray(importedGlobalVariables) && importedGlobalVariables.length > 0) {
-            setGlobalVariables(importedGlobalVariables);
-            localStorage.setItem('trpc-playground-variables', JSON.stringify(importedGlobalVariables));
+            const migratedVars = importedGlobalVariables.map(ensureVariableType);
+            setGlobalVariables(migratedVars);
+            localStorage.setItem('trpc-playground-variables', JSON.stringify(migratedVars));
           }
 
           if (importedData.settings && typeof importedData.settings === 'object') {

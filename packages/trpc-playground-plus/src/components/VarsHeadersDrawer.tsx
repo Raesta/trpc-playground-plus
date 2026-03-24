@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import Checkbox from "./ui/Checkbox";
 import Input from "./ui/Input";
 import { theme as t } from "../theme";
-import { Variable, Header } from "../types";
+import { Variable, Header, VariableType } from "../types";
 
 interface VarsHeadersDrawerProps {
   title: string;
@@ -16,23 +16,27 @@ interface VarsHeadersDrawerProps {
   extraActions?: React.ReactNode;
 }
 
-function resolveType(value: string): { type: string; color: string } {
-  if (!value.trim()) return { type: '', color: '' };
-  try {
-    const parsed = JSON.parse(value);
-    if (parsed === null) return { type: 'null', color: t.colors.text.muted };
-    if (Array.isArray(parsed)) return { type: 'array', color: '#e5c07b' };
-    switch (typeof parsed) {
-      case 'string':  return { type: 'string',  color: t.colors.accent.query };
-      case 'number':  return { type: 'number',  color: '#98c379' };
-      case 'boolean': return { type: 'boolean', color: '#c678dd' };
-      case 'object':  return { type: 'object',  color: '#d19a66' };
-      default:        return { type: 'string',  color: t.colors.accent.query };
-    }
-  } catch {
-    return { type: 'string', color: t.colors.accent.query };
-  }
-}
+const TYPE_OPTIONS: VariableType[] = ['string', 'number', 'boolean', 'object', 'array', 'null', 'json'];
+
+const TYPE_LABELS: Record<VariableType, string> = {
+  string: 'String',
+  number: 'Number',
+  boolean: 'Boolean',
+  object: 'Object',
+  array: 'Array',
+  null: 'Null',
+  json: 'JSON',
+};
+
+const TYPE_COLORS: Record<VariableType, string> = {
+  string: t.colors.accent.query,
+  number: '#98c379',
+  boolean: '#c678dd',
+  object: '#d19a66',
+  array: '#e5c07b',
+  null: t.colors.text.muted,
+  json: '#56b6c2',
+};
 
 const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 const RESERVED_NAMES = new Set(['trpc']);
@@ -101,15 +105,17 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
 
   // Variables handlers
   const addVariable = () => {
-    setVariables([...variables, { key: '', value: '', enabled: true }]);
+    setVariables([...variables, { key: '', value: '', type: 'string', enabled: true }]);
   };
 
-  const updateVariable = (index: number, field: 'key' | 'value' | 'enabled', newValue: string | boolean) => {
+  const updateVariable = (index: number, field: 'key' | 'value' | 'enabled' | 'type', newValue: string | boolean) => {
     const newVariables = [...variables];
     if (field === 'key' || field === 'value') {
       newVariables[index][field] = newValue as string;
     } else if (field === 'enabled') {
       newVariables[index][field] = newValue as boolean;
+    } else if (field === 'type') {
+      newVariables[index].type = newValue as VariableType;
     }
     setVariables(newVariables);
   };
@@ -274,6 +280,26 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                       checked={variable.enabled}
                       onChange={() => updateVariable(index, 'enabled', !variable.enabled)}
                     />
+                    <select
+                      value={variable.type || 'string'}
+                      onChange={(e) => updateVariable(index, 'type', e.target.value)}
+                      style={{
+                        backgroundColor: t.colors.bg.hover,
+                        color: TYPE_COLORS[variable.type || 'string'],
+                        border: `1px solid ${TYPE_COLORS[variable.type || 'string']}`,
+                        borderRadius: t.radius.sm,
+                        padding: '0 4px',
+                        height: '30px',
+                        fontSize: t.font.size.xs,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        width: '75px',
+                      }}
+                    >
+                      {TYPE_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{TYPE_LABELS[opt]}</option>
+                      ))}
+                    </select>
                     <Input
                       value={variable.key}
                       onChange={(value) => updateVariable(index, 'key', value)}
@@ -282,32 +308,8 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                     <Input
                       value={variable.value}
                       onChange={(value) => updateVariable(index, 'value', value)}
-                      placeholder="Value (JSON)"
+                      placeholder="Value"
                     />
-                    {(() => {
-                      const resolved = resolveType(variable.value);
-                      if (!resolved.type) return null;
-                      return (
-                        <span style={{
-                          fontSize: t.font.size.xs,
-                          color: resolved.color,
-                          border: `1px solid ${resolved.color}`,
-                          borderRadius: t.radius.sm,
-                          padding: '0 6px',
-                          whiteSpace: 'nowrap',
-                          height: '30px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxSizing: 'border-box',
-                          flex: 1,
-                          opacity: 0.8,
-                          maxWidth: '100px',
-                        }}>
-                          {resolved.type}
-                        </span>
-                      );
-                    })()}
                     <button
                       onClick={() => removeVariable(index)}
                       style={removeBtnStyle}

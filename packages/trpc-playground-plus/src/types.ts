@@ -47,9 +47,12 @@ export interface Header {
   enabled: boolean;
 }
 
+export type VariableType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'json';
+
 export interface Variable {
   key: string;
   value: string;
+  type: VariableType;
   enabled: boolean;
 }
 
