@@ -3,6 +3,7 @@ import Checkbox from "./ui/Checkbox";
 import Input from "./ui/Input";
 import { theme as t } from "../theme";
 import { Variable, Header, VariableType } from "../types";
+import { validateVariableValue } from "../utils/variable-validation";
 
 interface VarsHeadersDrawerProps {
   title: string;
@@ -271,10 +272,13 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
             </p>
 
             {variables.map((variable, index) => {
-              const error = isInvalidName(variable.key);
+              const nameError = isInvalidName(variable.key);
+              const valueError = variable.type !== 'null' ? validateVariableValue(variable.value, variable.type || 'string') : null;
+              const isJsonType = ['object', 'array', 'json'].includes(variable.type || 'string');
+              const isNull = variable.type === 'null';
               return (
                 <div key={index} style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '5px', alignItems: isJsonType ? 'flex-start' : 'center' }}>
                     <Checkbox
                       id={`${side}-variable-enabled-${index}`}
                       checked={variable.enabled}
@@ -305,12 +309,46 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                       onChange={(value) => updateVariable(index, 'key', value)}
                       placeholder="Name"
                     />
-                    <Input
-                      value={variable.type === 'null' ? '' : variable.value}
-                      onChange={(value) => updateVariable(index, 'value', value)}
-                      placeholder="Value"
-                      disabled={variable.type === 'null'}
-                    />
+                    {isJsonType ? (
+                      <textarea
+                        value={variable.value}
+                        onChange={(e) => updateVariable(index, 'value', e.target.value)}
+                        placeholder="Value"
+                        style={{
+                          flex: 1,
+                          boxSizing: 'border-box',
+                          backgroundColor: t.colors.bg.root,
+                          color: t.colors.text.primary,
+                          border: `1px solid ${valueError ? t.colors.accent.danger : t.colors.border.primary}`,
+                          padding: '6px 8px',
+                          minHeight: '60px',
+                          borderRadius: t.radius.sm,
+                          fontSize: t.font.size.sm,
+                          fontFamily: t.font.mono,
+                          outline: 'none',
+                          resize: 'vertical',
+                          transition: `border-color ${t.transition.fast}`,
+                        }}
+                        onFocus={(e) => {
+                          if (!valueError) {
+                            e.currentTarget.style.borderColor = t.colors.accent.primary;
+                            e.currentTarget.style.boxShadow = `0 0 0 2px ${t.colors.border.focus}`;
+                          }
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = valueError ? t.colors.accent.danger : t.colors.border.primary;
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        value={isNull ? '' : variable.value}
+                        onChange={(value) => updateVariable(index, 'value', value)}
+                        placeholder="Value"
+                        disabled={isNull}
+                        error={!!valueError}
+                      />
+                    )}
                     <button
                       onClick={() => removeVariable(index)}
                       style={removeBtnStyle}
@@ -320,9 +358,14 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                       ×
                     </button>
                   </div>
-                  {error && (
-                    <div style={{ color: t.colors.accent.danger, fontSize: t.font.size.xs, marginTop: '2px', marginLeft: '30px' }}>
-                      {error}
+                  {(nameError || valueError) && (
+                    <div style={{ marginTop: '2px', marginLeft: '30px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      {nameError && (
+                        <div style={{ color: t.colors.accent.danger, fontSize: t.font.size.xs }}>{nameError}</div>
+                      )}
+                      {valueError && (
+                        <div style={{ color: t.colors.accent.danger, fontSize: t.font.size.xs }}>{valueError}</div>
+                      )}
                     </div>
                   )}
                 </div>

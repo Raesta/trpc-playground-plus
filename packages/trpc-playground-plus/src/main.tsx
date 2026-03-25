@@ -8,6 +8,7 @@ import VarsHeadersDrawer from './components/VarsHeadersDrawer'
 import Settings from './components/Settings'
 import { theme as t } from './theme'
 import { loadSettings, saveSettings } from './settings'
+import { validateVariableValue } from './utils/variable-validation'
 
 interface RouterSchema {
   [key: string]: {
@@ -175,7 +176,7 @@ const Playground = () => {
       const varNames: string[] = [];
       const varValues: any[] = [];
       mergedVariables.forEach(v => {
-        if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim())) {
+        if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()) && !validateVariableValue(v.value, v.type || 'string')) {
           varNames.push(v.key.trim());
           varValues.push(coerceVariableValue(v.value, v.type || 'string'));
         }
