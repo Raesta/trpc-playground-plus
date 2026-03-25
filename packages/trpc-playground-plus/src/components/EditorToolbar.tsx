@@ -39,15 +39,16 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'none',
+    backgroundColor: t.colors.bg.primary,
     border: `1px solid ${t.colors.border.primary}`,
-    borderRadius: t.radius.sm,
-    color: t.colors.text.secondary,
+    borderRadius: t.radius.md,
+    color: t.colors.text.primary,
     fontSize: '13px',
-    padding: '3px 10px',
+    padding: '4px 10px',
     cursor: 'pointer',
-    transition: `all ${t.transition.fast}`,
+    transition: `background-color ${t.transition.normal}`,
     lineHeight: 1,
+    gap: '5px',
   },
 };
 
@@ -63,13 +64,15 @@ const ToolbarButton: React.FC<{
     style={variant === 'pill' ? styles.pill : styles.btn}
     onMouseOver={(e) => {
       e.currentTarget.style.backgroundColor = t.colors.bg.hover;
-      e.currentTarget.style.borderColor = t.colors.border.secondary;
+      if (variant === 'icon') {
+        e.currentTarget.style.borderColor = t.colors.border.secondary;
+      }
       e.currentTarget.style.color = t.colors.text.primary;
     }}
     onMouseOut={(e) => {
-      e.currentTarget.style.backgroundColor = 'transparent';
+      e.currentTarget.style.backgroundColor = variant === 'pill' ? t.colors.bg.primary : 'transparent';
       e.currentTarget.style.borderColor = variant === 'pill' ? t.colors.border.primary : 'transparent';
-      e.currentTarget.style.color = t.colors.text.secondary;
+      e.currentTarget.style.color = variant === 'pill' ? t.colors.text.primary : t.colors.text.secondary;
     }}
   >
     {children}
@@ -112,16 +115,31 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
   return (
     <div style={styles.toolbar}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        {onTabDrawerClick && <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick}>Headers & Variables</ToolbarButton>}
+        {onTabDrawerClick && (
+          <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick} variant="pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            Headers & Variables
+          </ToolbarButton>
+        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <ToolbarButton title="Fold all" onClick={handleFoldAll}>
+        <ToolbarButton title="Fold all" onClick={handleFoldAll} variant="pill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="4 14 12 6 20 14" />
             <polyline points="4 22 12 14 20 22" />
           </svg>
         </ToolbarButton>
-        <ToolbarButton title="Unfold all" onClick={handleUnfoldAll}>
+        <ToolbarButton title="Unfold all" onClick={handleUnfoldAll} variant="pill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="4 6 12 14 20 6" />
             <polyline points="4 14 12 22 20 14" />
