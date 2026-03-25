@@ -306,9 +306,10 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                       placeholder="Name"
                     />
                     <Input
-                      value={variable.value}
+                      value={variable.type === 'null' ? '' : variable.value}
                       onChange={(value) => updateVariable(index, 'value', value)}
                       placeholder="Value"
+                      disabled={variable.type === 'null'}
                     />
                     <button
                       onClick={() => removeVariable(index)}

@@ -5,6 +5,7 @@ interface InputProps {
   onChange: (value: string) => void;
   placeholder: string;
   type?: string;
+  disabled?: boolean;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -22,14 +23,15 @@ const styles: Record<string, React.CSSProperties> = {
   }
 }
 
-const Input = ({ value, onChange, placeholder, type = 'text' }: InputProps) => {
+const Input = ({ value, onChange, placeholder, type = 'text', disabled = false }: InputProps) => {
   return (
     <input
       type={type}
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={styles.input}
+      disabled={disabled}
+      style={{ ...styles.input, ...(disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }}
       onFocus={(e) => {
         e.currentTarget.style.borderColor = theme.colors.accent.primary;
         e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.border.focus}`;
