@@ -277,6 +277,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
             value={resultValue}
             onChange={onResultChange}
             isLoading={isLoading}
+            fontSize={fontSize}
           />
         </div>
       </div>

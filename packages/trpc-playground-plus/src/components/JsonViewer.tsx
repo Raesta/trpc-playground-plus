@@ -1,15 +1,16 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { json } from "@codemirror/lang-json"
 import { theme as t } from '../theme';
-import { editorThemeExtension } from '../editorTheme';
+import { createEditorTheme } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
 
 interface JsonViewerProps {
   value: string;
   onChange: (value: string) => void;
   isLoading?: boolean;
+  fontSize?: number;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -64,8 +65,9 @@ const Spinner: React.FC = () => (
   </>
 );
 
-export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoading }) => {
+export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoading, fontSize = 15 }) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+  const editorTheme = useMemo(() => createEditorTheme(fontSize), [fontSize]);
 
   return (
     <div style={styles.container}>
@@ -81,7 +83,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
         theme={vscodeDark}
         extensions={[
           json(),
-          editorThemeExtension,
+          editorTheme,
         ]}
         onChange={onChange}
         editable={false}
