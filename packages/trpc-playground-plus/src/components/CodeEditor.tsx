@@ -161,6 +161,40 @@ function createPropertyInfoNode(
   return container;
 }
 
+function createVariableInfoNode(
+  name: string,
+  type: string,
+  value: string,
+): HTMLElement {
+  const container = document.createElement('div');
+  Object.assign(container.style, { padding: '8px 10px', maxWidth: '300px', lineHeight: '1.5' });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', gap: '6px' });
+
+  const nameEl = document.createElement('span');
+  nameEl.textContent = name;
+  Object.assign(nameEl.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
+  header.appendChild(nameEl);
+
+  header.appendChild(createBadge('variable', theme.colors.accent.info));
+  header.appendChild(createBadge(type, TYPE_COLORS[type] || theme.colors.text.muted));
+  container.appendChild(header);
+
+  if (value) {
+    const label = document.createElement('div');
+    label.textContent = 'Value';
+    Object.assign(label.style, {
+      fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
+      textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
+    });
+    container.appendChild(label);
+    container.appendChild(createCodeBlock(value));
+  }
+
+  return container;
+}
+
 const autocompleteTheme = EditorView.theme({
   '.cm-tooltip.cm-tooltip-autocomplete': {
     border: `1px solid ${theme.colors.border.primary} !important`,
@@ -458,7 +492,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             .map(v => ({
               label: v.key.trim(),
               type: 'constant',
-              info: `Variable (${resolveVariableType(v.value)}): ${v.value || '(empty)'}`,
+              info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
               boost: -1,
             }));
 
@@ -591,7 +625,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       .map(v => ({
         label: v.key.trim(),
         type: 'constant',
-        info: `Variable (${resolveVariableType(v.value)}): ${v.value || '(empty)'}`,
+        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
       }));
 
     if (text.startsWith('trpc') || context.explicit) {
