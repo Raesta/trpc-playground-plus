@@ -673,7 +673,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
       }));
 
-    if (text.startsWith('trpc') || context.explicit) {
+    if (word && word.from < word.to) {
       return {
         from: word.from,
         options: [
@@ -683,10 +683,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       };
     }
 
-    if (variableOptions.length > 0 && word && word.from < word.to) {
+    if (context.explicit) {
       return {
-        from: word.from,
-        options: variableOptions,
+        from: word ? word.from : context.pos,
+        options: [
+          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode() },
+          ...variableOptions,
+        ]
       };
     }
 
