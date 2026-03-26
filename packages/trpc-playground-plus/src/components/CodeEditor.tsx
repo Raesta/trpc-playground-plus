@@ -541,10 +541,20 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   scanPos++;
                 }
                 const objectContent = fullAfterProcedure.substring(braceStart + 1, scanPos - 1);
+                // Detect "key:" syntax (explicit property)
                 const propertyRegex = /(\w+)\s*:/g;
                 let propMatch;
                 while ((propMatch = propertyRegex.exec(objectContent)) !== null) {
                   usedKeys.add(propMatch[1]);
+                }
+                // Detect shorthand properties: standalone identifiers (e.g. {name} = {name: name})
+                // Split by comma and check each token for a bare identifier (no colon)
+                const tokens = objectContent.split(',');
+                for (const token of tokens) {
+                  const trimmed = token.trim();
+                  if (/^\w+$/.test(trimmed)) {
+                    usedKeys.add(trimmed);
+                  }
                 }
               }
 
