@@ -345,6 +345,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         return {
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
+          boost: def.type === 'router' ? 80 : def.type === 'query' ? 60 : 40,
           apply,
           info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
         };
@@ -388,6 +389,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         return {
           label: key,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
+          boost: def.type === 'router' ? 80 : def.type === 'query' ? 60 : 40,
           apply,
           info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
         };
@@ -403,6 +405,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         {
           label: methodName,
           type: 'function',
+          boost: 60,
           apply: (view, _completion, from, to) => {
             const text = `${methodName}()`;
             view.dispatch({
@@ -493,7 +496,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
               label: v.key.trim(),
               type: 'constant',
               info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
-              boost: -1,
+              boost: 0,
             }));
 
           if (inputSchema.type === 'object' && inputSchema.properties) {
@@ -512,6 +515,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   {
                     label: '{}',
                     type: 'text',
+                    boost: 20,
                     apply: (view, _completion, from, to) => {
                       const text = '{}';
                       view.dispatch({
@@ -577,6 +581,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   return {
                     label: key,
                     type: isRequired ? 'property' : 'text',
+                    boost: 20,
                     apply,
                     info: () => createPropertyInfoNode(key, type, isRequired, propSchema.description),
                   };
@@ -632,7 +637,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       return {
         from: word.from,
         options: [
-          { label: 'trpc', type: 'text', apply: 'trpc.', info: 'Access tRPC properties' },
+          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: 'Access tRPC properties' },
           ...variableOptions,
         ]
       };
