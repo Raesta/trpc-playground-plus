@@ -161,6 +161,36 @@ function createPropertyInfoNode(
   return container;
 }
 
+function createTrpcInfoNode(): HTMLElement {
+  const container = document.createElement('div');
+  Object.assign(container.style, { padding: '8px 10px', maxWidth: '360px', lineHeight: '1.5' });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, { display: 'flex', alignItems: 'center', marginBottom: '6px' });
+  const title = document.createElement('span');
+  title.textContent = 'trpc';
+  Object.assign(title.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
+  header.appendChild(title);
+  header.appendChild(createBadge('client', theme.colors.accent.primary));
+  container.appendChild(header);
+
+  const desc = document.createElement('div');
+  desc.textContent = 'tRPC client — access your API routes via dot notation.';
+  Object.assign(desc.style, { fontSize: theme.font.size.sm, color: theme.colors.text.secondary, marginBottom: '8px' });
+  container.appendChild(desc);
+
+  const label = document.createElement('div');
+  label.textContent = 'Usage';
+  Object.assign(label.style, {
+    fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
+    textTransform: 'uppercase', letterSpacing: '0.5px',
+  });
+  container.appendChild(label);
+  container.appendChild(createCodeBlock('trpc.router.procedure.query(input)'));
+
+  return container;
+}
+
 function createVariableInfoNode(
   name: string,
   type: string,
@@ -647,7 +677,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       return {
         from: word.from,
         options: [
-          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: 'Access tRPC properties' },
+          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode() },
           ...variableOptions,
         ]
       };
