@@ -171,7 +171,7 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
               [isLeft ? 'left' : 'right']: 0,
               top: 0,
               height: '100%',
-              maxWidth: '30vw',
+              minWidth: '30vw',
               backgroundColor: t.colors.bg.primary,
               [isLeft ? 'borderRight' : 'borderLeft']: `1px solid ${t.colors.border.primary}`,
               padding: '10px',
