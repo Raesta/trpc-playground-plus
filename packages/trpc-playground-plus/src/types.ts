@@ -37,6 +37,8 @@ export interface Tab {
   title: string;
   content: string;
   isActive?: boolean;
+  variables: Variable[];
+  headers: Header[];
 }
 
 export interface Header {
@@ -45,13 +47,20 @@ export interface Header {
   enabled: boolean;
 }
 
+export type VariableType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'json';
+
 export interface Variable {
   key: string;
   value: string;
+  type: VariableType;
   enabled: boolean;
 }
+
+export type ThemeMode = 'dark' | 'light';
 
 export interface PlaygroundSettings {
   splitPosition: number;
   fontSize: number;
+  theme: ThemeMode;
+  requestTimeout: number;
 }

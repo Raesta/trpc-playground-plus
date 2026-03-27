@@ -1,36 +1,39 @@
+import { useMemo } from "react";
 import { Header, PlaygroundSettings, Tab, Variable } from "../types";
-import { theme as t } from "../theme";
+import { useTheme } from '../ThemeContext';
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
-  headers: Array<Header>;
+  globalHeaders: Array<Header>;
   settings: PlaygroundSettings;
-  variables: Array<Variable>;
+  globalVariables: Array<Variable>;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  button: {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
-    padding: '6px 12px',
-    borderRadius: t.radius.md,
-    cursor: 'pointer',
-    fontSize: t.font.size.md,
-    transition: `background-color ${t.transition.normal}`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  }
-}
+export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }: ExportButtonProps) => {
+  const theme = useTheme();
 
-export const ExportButton = ({ tabs, headers, settings, variables }: ExportButtonProps) => {
+  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
+    button: {
+      backgroundColor: theme.colors.bg.primary,
+      color: theme.colors.text.primary,
+      border: `1px solid ${theme.colors.border.primary}`,
+      padding: '6px 12px',
+      borderRadius: theme.radius.md,
+      cursor: 'pointer',
+      fontSize: theme.font.size.md,
+      transition: `background-color ${theme.transition.normal}`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }), [theme]);
+
   const exportStructure = () => {
     const exportData = {
       tabs,
-      headers,
+      globalHeaders,
       settings,
-      variables,
+      globalVariables,
       createdAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -51,8 +54,8 @@ export const ExportButton = ({ tabs, headers, settings, variables }: ExportButto
     <button
       onClick={exportStructure}
       style={styles.button}
-      onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-      onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+      onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
+      onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
     >
       <svg
         width="16"
