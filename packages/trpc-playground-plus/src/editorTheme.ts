@@ -1,68 +1,91 @@
 import { EditorView } from '@codemirror/view';
-import { theme } from './theme';
+import { ThemeConfig, getTheme } from './theme';
 import { Extension } from '@codemirror/state';
+import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
 
-export function createEditorTheme(fontSize = 15): Extension {
+export function getCodeMirrorTheme(theme: ThemeConfig): Extension {
+  // Compare bg.root to determine if it's a light or dark theme
+  return theme.colors.bg.root === '#ffffff' ? vscodeLight : vscodeDark;
+}
+
+export function createEditorTheme(fontSize = 15, theme?: ThemeConfig): Extension {
+  const t = theme || getTheme('dark');
   return EditorView.theme({
   '&': {
-    backgroundColor: `${theme.colors.bg.root} !important`,
-    color: theme.colors.text.primary,
+    backgroundColor: `${t.colors.bg.root} !important`,
+    color: t.colors.text.primary,
   },
   '.cm-content': {
-    caretColor: theme.colors.accent.primary,
-    fontFamily: theme.font.mono,
+    caretColor: t.colors.accent.primary,
+    fontFamily: t.font.mono,
     fontSize: `${fontSize}px`,
   },
   '.cm-cursor, .cm-dropCursor': {
-    borderLeftColor: `${theme.colors.accent.primary} !important`,
+    borderLeftColor: `${t.colors.accent.primary} !important`,
   },
   '.cm-gutters': {
-    backgroundColor: `${theme.colors.bg.root} !important`,
-    color: theme.colors.text.muted,
-    borderRight: `1px solid ${theme.colors.border.primary}`,
+    backgroundColor: `${t.colors.bg.root} !important`,
+    color: t.colors.text.muted,
+    borderRight: `1px solid ${t.colors.border.primary}`,
   },
   '.cm-activeLineGutter': {
-    backgroundColor: `${theme.colors.bg.hover} !important`,
-    color: `${theme.colors.text.secondary} !important`,
+    backgroundColor: `${t.colors.bg.hover} !important`,
+    color: `${t.colors.text.secondary} !important`,
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(22, 27, 34, 0.6) !important',
+    backgroundColor: `${t.colors.bg.hover}99 !important`,
   },
   '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: 'rgba(56, 139, 253, 0.15) !important',
+    backgroundColor: `${t.colors.accent.primary}26 !important`,
   },
   '.cm-selectionMatch': {
-    backgroundColor: 'rgba(56, 139, 253, 0.1)',
+    backgroundColor: `${t.colors.accent.primary}1a`,
   },
   '.cm-matchingBracket': {
-    backgroundColor: 'rgba(56, 139, 253, 0.25) !important',
-    outline: `1px solid ${theme.colors.border.secondary}`,
+    backgroundColor: `${t.colors.accent.primary}40 !important`,
+    outline: `1px solid ${t.colors.border.secondary}`,
   },
   '.cm-panels': {
-    backgroundColor: theme.colors.bg.primary,
-    color: theme.colors.text.primary,
+    backgroundColor: t.colors.bg.primary,
+    color: t.colors.text.primary,
   },
   '.cm-foldPlaceholder': {
-    backgroundColor: theme.colors.bg.hover,
-    border: `1px solid ${theme.colors.border.primary}`,
-    color: theme.colors.text.secondary,
+    backgroundColor: t.colors.bg.hover,
+    border: `1px solid ${t.colors.border.primary}`,
+    color: t.colors.text.secondary,
   },
   '.cm-tooltip': {
-    backgroundColor: `${theme.colors.bg.secondary} !important`,
-    border: `1px solid ${theme.colors.border.primary} !important`,
-    borderRadius: `${theme.radius.md} !important`,
+    backgroundColor: `${t.colors.bg.secondary} !important`,
+    border: `1px solid ${t.colors.border.primary} !important`,
+    borderRadius: `${t.radius.md} !important`,
   },
   '.cm-lineNumbers .cm-gutterElement': {
     minWidth: '3ch',
     padding: '0 8px 0 4px',
   },
   '.cm-foldGutter .cm-gutterElement span': {
-    fontSize: `${theme.font.size.base} !important`,
+    fontSize: `${t.font.size.base} !important`,
     lineHeight: 'inherit',
     verticalAlign: 'middle',
   },
   '.cm-scroller': {
-    fontFamily: theme.font.mono,
+    fontFamily: t.font.mono,
+    scrollbarColor: `${t.colors.border.secondary} ${t.colors.bg.root}`,
+    scrollbarWidth: 'thin',
+  },
+  '.cm-scroller::-webkit-scrollbar': {
+    width: '8px',
+    height: '8px',
+  },
+  '.cm-scroller::-webkit-scrollbar-track': {
+    backgroundColor: t.colors.bg.root,
+  },
+  '.cm-scroller::-webkit-scrollbar-thumb': {
+    backgroundColor: t.colors.border.secondary,
+    borderRadius: '4px',
+  },
+  '.cm-scroller::-webkit-scrollbar-thumb:hover': {
+    backgroundColor: t.colors.text.muted,
   },
 });
 }

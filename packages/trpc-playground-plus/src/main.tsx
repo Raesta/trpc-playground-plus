@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
@@ -6,7 +6,9 @@ import { ExportButton } from './components/ExportButton'
 import { Tab, Variable, Header, VariableType } from './types'
 import VarsHeadersDrawer from './components/VarsHeadersDrawer'
 import Settings from './components/Settings'
-import { theme as t } from './theme'
+import { getTheme } from './theme'
+import { ThemeProvider } from './ThemeContext'
+import { useTheme } from './ThemeContext'
 import { loadSettings, saveSettings } from './settings'
 import { validateVariableValue } from './utils/variable-validation'
 
@@ -56,6 +58,7 @@ function ensureTabFields(tab: any): Tab {
 }
 
 const Playground = () => {
+  const theme = useTheme();
   const [config, setConfig] = useState<PlaygroundConfig | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [result, setResult] = useState('');
@@ -66,6 +69,7 @@ const Playground = () => {
   const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
+  const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleSplitChange = useCallback((pct: number) => {
@@ -73,9 +77,12 @@ const Playground = () => {
     saveSettings({ splitPosition: pct });
   }, []);
 
-  const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number }>) => {
+  const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
     if (partial.fontSize !== undefined) {
       setFontSize(partial.fontSize);
+    }
+    if (partial.requestTimeout !== undefined) {
+      setRequestTimeout(partial.requestTimeout);
     }
     saveSettings(partial);
   }, []);
@@ -191,7 +198,15 @@ const Playground = () => {
           }
         })();
       `);
-      const result = await executeFunction(trpcClient, ...varValues);
+
+      const resultPromise = executeFunction(trpcClient, ...varValues);
+      const result = requestTimeout > 0
+        ? await Promise.race([
+            resultPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`Request timed out after ${requestTimeout / 1000}s`)), requestTimeout))
+          ])
+        : await resultPromise;
+
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
@@ -217,7 +232,6 @@ const Playground = () => {
           const content = e.target?.result as string;
           const importedData = JSON.parse(content);
 
-          // Support both old format (variables/headers) and new format (globalVariables/globalHeaders)
           const importedGlobalVariables = importedData.globalVariables || importedData.variables;
           const importedGlobalHeaders = importedData.globalHeaders || importedData.headers;
 
@@ -252,6 +266,7 @@ const Playground = () => {
             const merged = loadSettings();
             setSplitPosition(merged.splitPosition);
             setFontSize(merged.fontSize);
+            setRequestTimeout(merged.requestTimeout);
           }
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
@@ -265,14 +280,14 @@ const Playground = () => {
   };
 
   const btnStyle: React.CSSProperties = {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
+    backgroundColor: theme.colors.bg.primary,
+    color: theme.colors.text.primary,
+    border: `1px solid ${theme.colors.border.primary}`,
     padding: '6px 12px',
-    borderRadius: t.radius.md,
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
-    fontSize: t.font.size.md,
-    transition: `background-color ${t.transition.normal}`,
+    fontSize: theme.font.size.md,
+    transition: `background-color ${theme.transition.normal}`,
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
@@ -302,19 +317,19 @@ const Playground = () => {
           side="left"
         />
       )}
-      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize }} onSettingsChange={handleSettingsChange} />
-      <div style={{ padding: 10, fontFamily: t.font.sans }}>
+      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize, theme: loadSettings().theme, requestTimeout }} onSettingsChange={handleSettingsChange} />
+      <div style={{ padding: 10, fontFamily: theme.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
-            Connected to : <code>{config.trpcEndpoint}</code>
+          <p style={{ color: theme.colors.text.secondary, fontSize: theme.font.size.md }}>
+            Connected to : <code style={{ color: theme.colors.text.primary, backgroundColor: theme.colors.bg.code, padding: '2px 6px', borderRadius: theme.radius.sm, fontFamily: theme.font.mono }}>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <ExportButton tabs={tabs} globalHeaders={globalHeaders} settings={loadSettings()} globalVariables={globalVariables} />
             <button
               onClick={importStructure}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -326,8 +341,8 @@ const Playground = () => {
             <button
               onClick={() => setGlobalDrawerOpen(!globalDrawerOpen)}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -339,8 +354,8 @@ const Playground = () => {
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
@@ -371,8 +386,37 @@ const Playground = () => {
   )
 }
 
+const App = () => {
+  const [themeMode, setThemeMode] = useState(() => loadSettings().theme);
+  const currentTheme = useMemo(() => getTheme(themeMode), [themeMode]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setThemeMode(loadSettings().theme);
+    };
+    window.addEventListener('storage', handleStorage);
+    // Also poll for changes from same tab
+    const interval = setInterval(() => {
+      const current = loadSettings().theme;
+      setThemeMode(prev => prev !== current ? current : prev);
+    }, 200);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <ThemeProvider value={currentTheme}>
+      <div style={{ backgroundColor: currentTheme.colors.bg.root, minHeight: '100vh' }}>
+        <Playground />
+      </div>
+    </ThemeProvider>
+  );
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Playground />
+    <App />
   </React.StrictMode>
 )

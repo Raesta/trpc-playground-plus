@@ -56,7 +56,11 @@ export interface Variable {
   enabled: boolean;
 }
 
+export type ThemeMode = 'dark' | 'light';
+
 export interface PlaygroundSettings {
   splitPosition: number;
   fontSize: number;
+  theme: ThemeMode;
+  requestTimeout: number;
 }

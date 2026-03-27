@@ -1,8 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { unfoldAll, foldable, foldEffect } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
-import { theme as t } from '../theme';
+import { useTheme } from '../ThemeContext';
 
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
@@ -10,77 +10,85 @@ interface EditorToolbarProps {
   children?: React.ReactNode;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '4px',
-    padding: '4px 8px',
-    backgroundColor: t.colors.bg.primary,
-    borderBottom: `1px solid ${t.colors.border.primary}`,
-    flexShrink: 0,
-  },
-  btn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'none',
-    border: '1px solid transparent',
-    borderRadius: t.radius.sm,
-    color: t.colors.text.secondary,
-    fontSize: '13px',
-    padding: '2px 6px',
-    cursor: 'pointer',
-    transition: `all ${t.transition.fast}`,
-    lineHeight: 1,
-  },
-  pill: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.colors.bg.primary,
-    border: `1px solid ${t.colors.border.primary}`,
-    borderRadius: t.radius.md,
-    color: t.colors.text.primary,
-    fontSize: '13px',
-    padding: '4px 10px',
-    cursor: 'pointer',
-    transition: `background-color ${t.transition.normal}`,
-    lineHeight: 1,
-    gap: '5px',
-  },
-};
-
 const ToolbarButton: React.FC<{
   title: string;
   onClick: () => void;
   variant?: 'icon' | 'pill';
   children: React.ReactNode;
-}> = ({ title, onClick, variant = 'icon', children }) => (
-  <button
-    title={title}
-    onClick={onClick}
-    style={variant === 'pill' ? styles.pill : styles.btn}
-    onMouseOver={(e) => {
-      e.currentTarget.style.backgroundColor = t.colors.bg.hover;
-      if (variant === 'icon') {
-        e.currentTarget.style.borderColor = t.colors.border.secondary;
-      }
-      e.currentTarget.style.color = t.colors.text.primary;
-    }}
-    onMouseOut={(e) => {
-      e.currentTarget.style.backgroundColor = variant === 'pill' ? t.colors.bg.primary : 'transparent';
-      e.currentTarget.style.borderColor = variant === 'pill' ? t.colors.border.primary : 'transparent';
-      e.currentTarget.style.color = variant === 'pill' ? t.colors.text.primary : t.colors.text.secondary;
-    }}
-  >
-    {children}
-  </button>
-);
+}> = ({ title, onClick, variant = 'icon', children }) => {
+  const theme = useTheme();
+
+  const styles = useMemo(() => ({
+    btn: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'none',
+      border: '1px solid transparent',
+      borderRadius: theme.radius.sm,
+      color: theme.colors.text.secondary,
+      fontSize: '13px',
+      padding: '2px 6px',
+      cursor: 'pointer',
+      transition: `all ${theme.transition.fast}`,
+      lineHeight: 1,
+    } as React.CSSProperties,
+    pill: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.bg.primary,
+      border: `1px solid ${theme.colors.border.primary}`,
+      borderRadius: theme.radius.md,
+      color: theme.colors.text.primary,
+      fontSize: '13px',
+      padding: '4px 10px',
+      cursor: 'pointer',
+      transition: `background-color ${theme.transition.normal}`,
+      lineHeight: 1,
+      gap: '5px',
+    } as React.CSSProperties,
+  }), [theme]);
+
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      style={variant === 'pill' ? styles.pill : styles.btn}
+      onMouseOver={(e) => {
+        e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+        if (variant === 'icon') {
+          e.currentTarget.style.borderColor = theme.colors.border.secondary;
+        }
+        e.currentTarget.style.color = theme.colors.text.primary;
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.backgroundColor = variant === 'pill' ? theme.colors.bg.primary : 'transparent';
+        e.currentTarget.style.borderColor = variant === 'pill' ? theme.colors.border.primary : 'transparent';
+        e.currentTarget.style.color = variant === 'pill' ? theme.colors.text.primary : theme.colors.text.secondary;
+      }}
+    >
+      {children}
+    </button>
+  );
+};
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, children }) => {
+  const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
+
+  const styles = useMemo(() => ({
+    toolbar: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '4px',
+      padding: '4px 8px',
+      backgroundColor: theme.colors.bg.primary,
+      borderBottom: `1px solid ${theme.colors.border.primary}`,
+      flexShrink: 0,
+    } as React.CSSProperties,
+  }), [theme]);
 
   const handleFoldAll = useCallback(() => {
     const view = getView();

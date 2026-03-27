@@ -1,5 +1,6 @@
+import { useMemo } from "react";
 import { Header, PlaygroundSettings, Tab, Variable } from "../types";
-import { theme as t } from "../theme";
+import { useTheme } from '../ThemeContext';
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
@@ -8,23 +9,25 @@ interface ExportButtonProps {
   globalVariables: Array<Variable>;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  button: {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
-    padding: '6px 12px',
-    borderRadius: t.radius.md,
-    cursor: 'pointer',
-    fontSize: t.font.size.md,
-    transition: `background-color ${t.transition.normal}`,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  }
-}
-
 export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }: ExportButtonProps) => {
+  const theme = useTheme();
+
+  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
+    button: {
+      backgroundColor: theme.colors.bg.primary,
+      color: theme.colors.text.primary,
+      border: `1px solid ${theme.colors.border.primary}`,
+      padding: '6px 12px',
+      borderRadius: theme.radius.md,
+      cursor: 'pointer',
+      fontSize: theme.font.size.md,
+      transition: `background-color ${theme.transition.normal}`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    }
+  }), [theme]);
+
   const exportStructure = () => {
     const exportData = {
       tabs,
@@ -51,8 +54,8 @@ export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }:
     <button
       onClick={exportStructure}
       style={styles.button}
-      onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-      onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+      onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
+      onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
     >
       <svg
         width="16"

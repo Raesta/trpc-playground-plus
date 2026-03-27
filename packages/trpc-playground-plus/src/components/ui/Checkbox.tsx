@@ -1,5 +1,5 @@
 import React from 'react';
-import { theme as t } from '../../theme';
+import { useTheme } from '../../ThemeContext';
 
 interface CheckboxProps {
   checked: boolean;
@@ -18,6 +18,8 @@ const Checkbox: React.FC<CheckboxProps> = ({
   className,
   disabled
 }) => {
+  const theme = useTheme();
+
   const styles: Record<string, React.CSSProperties> = {
     containerStyles: {
       position: 'relative',
@@ -37,11 +39,11 @@ const Checkbox: React.FC<CheckboxProps> = ({
       position: 'relative',
       width: '24px',
       height: '24px',
-      backgroundColor: checked ? t.colors.accent.checkbox : t.colors.bg.root,
-      border: `1px solid ${checked ? t.colors.accent.checkbox : t.colors.border.secondary}`,
-      borderRadius: t.radius.sm,
+      backgroundColor: checked ? theme.colors.accent.checkbox : theme.colors.bg.root,
+      border: `1px solid ${checked ? theme.colors.accent.checkbox : theme.colors.border.secondary}`,
+      borderRadius: theme.radius.sm,
       cursor: disabled ? 'default' : 'pointer',
-      transition: `all ${t.transition.normal}`
+      transition: `all ${theme.transition.normal}`
     },
     checkmarkStyles: {
       position: 'absolute',
@@ -87,12 +89,12 @@ const Checkbox: React.FC<CheckboxProps> = ({
         onClick={handleClick}
         onMouseOver={(e) => {
           if (!disabled && !checked) {
-            (e.currentTarget as HTMLDivElement).style.borderColor = t.colors.accent.primary;
+            (e.currentTarget as HTMLDivElement).style.borderColor = theme.colors.accent.primary;
           }
         }}
         onMouseOut={(e) => {
           if (!disabled && !checked) {
-            (e.currentTarget as HTMLDivElement).style.borderColor = t.colors.border.secondary;
+            (e.currentTarget as HTMLDivElement).style.borderColor = theme.colors.border.secondary;
           }
         }}
       >

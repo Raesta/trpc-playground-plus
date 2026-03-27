@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Checkbox from "./ui/Checkbox";
 import Input from "./ui/Input";
-import { theme as t } from "../theme";
+import { useTheme } from '../ThemeContext';
 import { Variable, Header, VariableType } from "../types";
 import { validateVariableValue } from "../utils/variable-validation";
 
@@ -29,16 +29,6 @@ const TYPE_LABELS: Record<VariableType, string> = {
   json: 'JSON',
 };
 
-const TYPE_COLORS: Record<VariableType, string> = {
-  string: t.colors.accent.query,
-  number: '#98c379',
-  boolean: '#c678dd',
-  object: '#d19a66',
-  array: '#e5c07b',
-  null: t.colors.text.muted,
-  json: '#56b6c2',
-};
-
 const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 const RESERVED_NAMES = new Set(['trpc']);
 
@@ -50,41 +40,52 @@ const isInvalidName = (key: string): string | null => {
   return null;
 };
 
-const addBtnStyle: React.CSSProperties = {
-  backgroundColor: t.colors.bg.hover,
-  color: t.colors.text.primary,
-  border: `1px solid ${t.colors.border.primary}`,
-  padding: '8px 16px',
-  borderRadius: t.radius.md,
-  marginTop: '10px',
-  cursor: 'pointer',
-  width: '100%',
-  transition: `background-color ${t.transition.normal}`,
-};
-
-const removeBtnStyle: React.CSSProperties = {
-  marginLeft: 'auto',
-  backgroundColor: t.colors.bg.hover,
-  color: t.colors.text.primary,
-  border: `1px solid ${t.colors.border.primary}`,
-  borderRadius: t.radius.sm,
-  cursor: 'pointer',
-  width: '30px',
-  height: '30px',
-  flexShrink: 0,
-  transition: `background-color ${t.transition.fast}`,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  color: t.colors.text.secondary,
-  fontSize: t.font.size.sm,
-  margin: '0 0 8px',
-  fontWeight: 600,
-};
-
 const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, headers, setHeaders, side, extraActions }: VarsHeadersDrawerProps) => {
+  const theme = useTheme();
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
+
+  const TYPE_COLORS: Record<VariableType, string> = useMemo(() => ({
+    string: theme.colors.accent.query,
+    number: '#98c379',
+    boolean: '#c678dd',
+    object: '#d19a66',
+    array: '#e5c07b',
+    null: theme.colors.text.muted,
+    json: '#56b6c2',
+  }), [theme]);
+
+  const addBtnStyle: React.CSSProperties = useMemo(() => ({
+    backgroundColor: theme.colors.bg.hover,
+    color: theme.colors.text.primary,
+    border: `1px solid ${theme.colors.border.primary}`,
+    padding: '8px 16px',
+    borderRadius: theme.radius.md,
+    marginTop: '10px',
+    cursor: 'pointer',
+    width: '100%',
+    transition: `background-color ${theme.transition.normal}`,
+  }), [theme]);
+
+  const removeBtnStyle: React.CSSProperties = useMemo(() => ({
+    marginLeft: 'auto',
+    backgroundColor: theme.colors.bg.hover,
+    color: theme.colors.text.primary,
+    border: `1px solid ${theme.colors.border.primary}`,
+    borderRadius: theme.radius.sm,
+    cursor: 'pointer',
+    width: '30px',
+    height: '30px',
+    flexShrink: 0,
+    transition: `background-color ${theme.transition.fast}`,
+  }), [theme]);
+
+  const sectionTitleStyle: React.CSSProperties = useMemo(() => ({
+    color: theme.colors.text.secondary,
+    fontSize: theme.font.size.sm,
+    margin: '0 0 8px',
+    fontWeight: 600,
+  }), [theme]);
 
   useEffect(() => {
     if (open) {
@@ -160,7 +161,7 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: t.colors.bg.overlay,
+              backgroundColor: theme.colors.bg.overlay,
               zIndex: 9,
               animation: closing ? 'fadeOut 0.25s forwards' : 'fadeIn 0.2s forwards',
             }}
@@ -172,8 +173,8 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
               top: 0,
               height: '100%',
               minWidth: '30vw',
-              backgroundColor: t.colors.bg.primary,
-              [isLeft ? 'borderRight' : 'borderLeft']: `1px solid ${t.colors.border.primary}`,
+              backgroundColor: theme.colors.bg.primary,
+              [isLeft ? 'borderRight' : 'borderLeft']: `1px solid ${theme.colors.border.primary}`,
               padding: '10px',
               boxSizing: 'border-box',
               overflow: 'auto',
@@ -183,7 +184,7 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
           >
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 style={{ color: t.colors.text.primary, margin: 0 }}>{title}</h3>
+              <h3 style={{ color: theme.colors.text.primary, margin: 0 }}>{title}</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {extraActions}
                 <button
@@ -191,15 +192,15 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: t.colors.text.secondary,
+                    color: theme.colors.text.secondary,
                     fontSize: '20px',
                     cursor: 'pointer',
                     padding: '0 4px',
                     lineHeight: 1,
-                    transition: `color ${t.transition.fast}`,
+                    transition: `color ${theme.transition.fast}`,
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.color = t.colors.text.primary}
-                  onMouseOut={(e) => e.currentTarget.style.color = t.colors.text.secondary}
+                  onMouseOver={(e) => e.currentTarget.style.color = theme.colors.text.primary}
+                  onMouseOut={(e) => e.currentTarget.style.color = theme.colors.text.secondary}
                 >
                   ×
                 </button>
@@ -229,16 +230,16 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                 <button
                   onClick={() => removeHeader(index)}
                   style={{
-                    backgroundColor: t.colors.bg.hover,
-                    color: t.colors.text.primary,
-                    border: `1px solid ${t.colors.border.primary}`,
-                    borderRadius: t.radius.sm,
+                    backgroundColor: theme.colors.bg.hover,
+                    color: theme.colors.text.primary,
+                    border: `1px solid ${theme.colors.border.primary}`,
+                    borderRadius: theme.radius.sm,
                     cursor: 'pointer',
                     width: '30px',
-                    transition: `background-color ${t.transition.fast}`,
+                    transition: `background-color ${theme.transition.fast}`,
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.accent.danger}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.accent.danger}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
                 >
                   ×
                 </button>
@@ -248,27 +249,27 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
             <button
               onClick={addHeader}
               style={addBtnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.active}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.active}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
             >
               + Add header
             </button>
 
             {/* Divider */}
             <div style={{
-              borderTop: `1px solid ${t.colors.border.primary}`,
+              borderTop: `1px solid ${theme.colors.border.primary}`,
               margin: '16px 0',
             }} />
 
             {/* Variables Section */}
             <h4 style={sectionTitleStyle}>Variables</h4>
             <p style={{
-              color: t.colors.text.muted,
-              fontSize: t.font.size.xs,
+              color: theme.colors.text.muted,
+              fontSize: theme.font.size.xs,
               margin: '0 0 12px',
               lineHeight: 1.5,
             }}>
-              Define variables to reuse in your queries. Use a valid JS name and a JSON value, then reference it directly in the editor — e.g. <code style={{ color: t.colors.text.secondary }}>trpc.user.query(myVar)</code>
+              Define variables to reuse in your queries. Use a valid JS name and a JSON value, then reference it directly in the editor — e.g. <code style={{ color: theme.colors.text.primary, backgroundColor: theme.colors.bg.code, padding: '2px 6px', borderRadius: theme.radius.sm, fontFamily: theme.font.mono }}>trpc.user.query(myVar)</code>
             </p>
 
             {variables.map((variable, index) => {
@@ -288,13 +289,13 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                       value={variable.type || 'string'}
                       onChange={(e) => updateVariable(index, 'type', e.target.value)}
                       style={{
-                        backgroundColor: t.colors.bg.hover,
+                        backgroundColor: theme.colors.bg.hover,
                         color: TYPE_COLORS[variable.type || 'string'],
                         border: `1px solid ${TYPE_COLORS[variable.type || 'string']}`,
-                        borderRadius: t.radius.sm,
+                        borderRadius: theme.radius.sm,
                         padding: '0 4px',
                         height: '30px',
-                        fontSize: t.font.size.xs,
+                        fontSize: theme.font.size.xs,
                         cursor: 'pointer',
                         flexShrink: 0,
                         width: '75px',
@@ -317,26 +318,26 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                         style={{
                           flex: 1,
                           boxSizing: 'border-box',
-                          backgroundColor: t.colors.bg.root,
-                          color: t.colors.text.primary,
-                          border: `1px solid ${valueError ? t.colors.accent.danger : t.colors.border.primary}`,
+                          backgroundColor: theme.colors.bg.root,
+                          color: theme.colors.text.primary,
+                          border: `1px solid ${valueError ? theme.colors.accent.danger : theme.colors.border.primary}`,
                           padding: '6px 8px',
                           minHeight: '60px',
-                          borderRadius: t.radius.sm,
-                          fontSize: t.font.size.sm,
-                          fontFamily: t.font.mono,
+                          borderRadius: theme.radius.sm,
+                          fontSize: theme.font.size.sm,
+                          fontFamily: theme.font.mono,
                           outline: 'none',
                           resize: 'vertical',
-                          transition: `border-color ${t.transition.fast}`,
+                          transition: `border-color ${theme.transition.fast}`,
                         }}
                         onFocus={(e) => {
                           if (!valueError) {
-                            e.currentTarget.style.borderColor = t.colors.accent.primary;
-                            e.currentTarget.style.boxShadow = `0 0 0 2px ${t.colors.border.focus}`;
+                            e.currentTarget.style.borderColor = theme.colors.accent.primary;
+                            e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.border.focus}`;
                           }
                         }}
                         onBlur={(e) => {
-                          e.currentTarget.style.borderColor = valueError ? t.colors.accent.danger : t.colors.border.primary;
+                          e.currentTarget.style.borderColor = valueError ? theme.colors.accent.danger : theme.colors.border.primary;
                           e.currentTarget.style.boxShadow = 'none';
                         }}
                       />
@@ -352,8 +353,8 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                     <button
                       onClick={() => removeVariable(index)}
                       style={removeBtnStyle}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.accent.danger}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.accent.danger}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
                     >
                       ×
                     </button>
@@ -361,10 +362,10 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
                   {(nameError || valueError) && (
                     <div style={{ marginTop: '2px', marginLeft: '30px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
                       {nameError && (
-                        <div style={{ color: t.colors.accent.danger, fontSize: t.font.size.xs }}>{nameError}</div>
+                        <div style={{ color: theme.colors.accent.danger, fontSize: theme.font.size.xs }}>{nameError}</div>
                       )}
                       {valueError && (
-                        <div style={{ color: t.colors.accent.danger, fontSize: t.font.size.xs }}>{valueError}</div>
+                        <div style={{ color: theme.colors.accent.danger, fontSize: theme.font.size.xs }}>{valueError}</div>
                       )}
                     </div>
                   )}
@@ -375,8 +376,8 @@ const VarsHeadersDrawer = ({ title, open, setOpen, variables, setVariables, head
             <button
               onClick={addVariable}
               style={addBtnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.active}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.active}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
             >
               + Add variable
             </button>

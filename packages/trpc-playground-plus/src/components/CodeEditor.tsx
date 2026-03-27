@@ -1,6 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import { getCodeMirrorTheme } from '../editorTheme';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
 import { RouterSchema, Variable } from '../types';
 import { Decoration, EditorView, WidgetType, GutterMarker, gutter, ViewUpdate } from '@codemirror/view';
@@ -12,6 +12,8 @@ import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { validateCodeWithCache, resolveVariableType } from '../utils/zod-validator';
 import { createEditorTheme } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
+import { useTheme } from '../ThemeContext';
+import { ThemeConfig } from '../theme';
 
 interface CodeEditorProps {
   value: string;
@@ -23,35 +25,16 @@ interface CodeEditorProps {
   fontSize?: number;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    border: `1px solid ${theme.colors.border.primary}`,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-    height: '100%',
-    width: '100%'
-  },
-  editor: {
-    height: '100%',
-    width: '100%',
-    overflow: 'hidden',
-    minHeight: 0,
-    flex: 1,
-  }
-}
+// --- DOM helper functions (accept theme as parameter) ---
 
-import { theme } from '../theme';
-
-const TYPE_COLORS: Record<string, string> = {
-  query: theme.colors.accent.query,
-  mutation: theme.colors.accent.mutation,
-  router: theme.colors.accent.router,
-  subscription: theme.colors.accent.subscription,
+const FIXED_TYPE_COLORS: Record<string, string> = {
+  query: '#3b82f6',
+  mutation: '#f59e0b',
+  router: '#a855f7',
+  subscription: '#10b981',
 };
 
-function createBadge(text: string, color: string): HTMLSpanElement {
+function createBadge(text: string, color: string, theme: ThemeConfig): HTMLSpanElement {
   const badge = document.createElement('span');
   badge.textContent = text;
   Object.assign(badge.style, {
@@ -68,7 +51,7 @@ function createBadge(text: string, color: string): HTMLSpanElement {
   return badge;
 }
 
-function createCodeBlock(content: string): HTMLElement {
+function createCodeBlock(content: string, theme: ThemeConfig): HTMLElement {
   const pre = document.createElement('pre');
   Object.assign(pre.style, {
     margin: '4px 0 0',
@@ -90,15 +73,12 @@ function createCodeBlock(content: string): HTMLElement {
 function createProcedureInfoNode(
   name: string,
   type: string,
+  theme: ThemeConfig,
   inputSchema?: string,
   outputSchema?: string,
 ): HTMLElement {
   const container = document.createElement('div');
-  Object.assign(container.style, {
-    padding: '8px 10px',
-    maxWidth: '360px',
-    lineHeight: '1.5',
-  });
+  Object.assign(container.style, { padding: '8px 10px', maxWidth: '360px', lineHeight: '1.5' });
 
   const header = document.createElement('div');
   Object.assign(header.style, { display: 'flex', alignItems: 'center', marginBottom: '6px' });
@@ -106,7 +86,7 @@ function createProcedureInfoNode(
   title.textContent = name;
   Object.assign(title.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(title);
-  header.appendChild(createBadge(type, TYPE_COLORS[type] || theme.colors.text.muted));
+  header.appendChild(createBadge(type, FIXED_TYPE_COLORS[type] || theme.colors.text.muted, theme));
   container.appendChild(header);
 
   const addSection = (labelText: string, content: string) => {
@@ -117,7 +97,7 @@ function createProcedureInfoNode(
       textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
     });
     container.appendChild(label);
-    container.appendChild(createCodeBlock(content));
+    container.appendChild(createCodeBlock(content, theme));
   };
 
   if (inputSchema) addSection('Input', inputSchema);
@@ -130,6 +110,7 @@ function createPropertyInfoNode(
   name: string,
   type: string,
   isRequired: boolean,
+  theme: ThemeConfig,
   description?: string,
 ): HTMLElement {
   const container = document.createElement('div');
@@ -148,7 +129,7 @@ function createPropertyInfoNode(
   Object.assign(typeEl.style, { fontSize: theme.font.size.sm, color: theme.colors.accent.info, fontFamily: theme.font.mono });
   header.appendChild(typeEl);
 
-  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? theme.colors.accent.danger : theme.colors.text.muted));
+  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? theme.colors.accent.danger : theme.colors.text.muted, theme));
   container.appendChild(header);
 
   if (description) {
@@ -161,7 +142,7 @@ function createPropertyInfoNode(
   return container;
 }
 
-function createTrpcInfoNode(): HTMLElement {
+function createTrpcInfoNode(theme: ThemeConfig): HTMLElement {
   const container = document.createElement('div');
   Object.assign(container.style, { padding: '8px 10px', maxWidth: '360px', lineHeight: '1.5' });
 
@@ -171,7 +152,7 @@ function createTrpcInfoNode(): HTMLElement {
   title.textContent = 'trpc';
   Object.assign(title.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(title);
-  header.appendChild(createBadge('client', theme.colors.accent.primary));
+  header.appendChild(createBadge('client', theme.colors.accent.primary, theme));
   container.appendChild(header);
 
   const desc = document.createElement('div');
@@ -186,7 +167,7 @@ function createTrpcInfoNode(): HTMLElement {
     textTransform: 'uppercase', letterSpacing: '0.5px',
   });
   container.appendChild(label);
-  container.appendChild(createCodeBlock('trpc.router.procedure.query(input)'));
+  container.appendChild(createCodeBlock('trpc.router.procedure.query(input)', theme));
 
   return container;
 }
@@ -195,6 +176,7 @@ function createVariableInfoNode(
   name: string,
   type: string,
   value: string,
+  theme: ThemeConfig,
 ): HTMLElement {
   const container = document.createElement('div');
   Object.assign(container.style, { padding: '8px 10px', maxWidth: '300px', lineHeight: '1.5' });
@@ -207,8 +189,8 @@ function createVariableInfoNode(
   Object.assign(nameEl.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(nameEl);
 
-  header.appendChild(createBadge('variable', theme.colors.accent.info));
-  header.appendChild(createBadge(type, TYPE_COLORS[type] || theme.colors.text.muted));
+  header.appendChild(createBadge('variable', theme.colors.accent.info, theme));
+  header.appendChild(createBadge(type, FIXED_TYPE_COLORS[type] || theme.colors.text.muted, theme));
   container.appendChild(header);
 
   if (value) {
@@ -219,57 +201,80 @@ function createVariableInfoNode(
       textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
     });
     container.appendChild(label);
-    container.appendChild(createCodeBlock(value));
+    container.appendChild(createCodeBlock(value, theme));
   }
 
   return container;
 }
 
-const autocompleteTheme = EditorView.theme({
-  '.cm-tooltip.cm-tooltip-autocomplete': {
-    border: `1px solid ${theme.colors.border.primary} !important`,
-    borderRadius: `${theme.radius.md} !important`,
-    backgroundColor: `${theme.colors.bg.secondary} !important`,
-    boxShadow: `${theme.shadow.lg} !important`,
-  },
-  '.cm-tooltip-autocomplete ul': {
-    fontFamily: `${theme.font.mono} !important`,
-    fontSize: `${theme.font.size.base} !important`,
-  },
-  '.cm-tooltip-autocomplete ul li': {
-    padding: '4px 10px !important',
-    borderBottom: '1px solid #ffffff08',
-  },
-  '.cm-tooltip-autocomplete ul li[aria-selected]': {
-    backgroundColor: `${theme.colors.bg.active} !important`,
-    color: `${theme.colors.text.primary} !important`,
-  },
-  '.cm-completionIcon': {
-    width: '1.2em !important',
-    textAlign: 'center',
-  },
-  '.cm-completionIcon-class::after': { content: '"◆"', color: theme.colors.accent.router },
-  '.cm-completionIcon-function::after': { content: '"ƒ"', color: theme.colors.accent.query },
-  '.cm-completionIcon-method::after': { content: '"ƒ"', color: theme.colors.accent.mutation },
-  '.cm-completionIcon-property::after': { content: '"●"', color: theme.colors.accent.danger },
-  '.cm-completionIcon-variable::after': { content: '"○"', color: theme.colors.text.muted },
-  '.cm-completionIcon-text::after': { content: '"T"', color: theme.colors.text.secondary },
-  '.cm-tooltip.cm-completionInfo': {
-    backgroundColor: `${theme.colors.bg.secondary} !important`,
-    border: `1px solid ${theme.colors.border.primary} !important`,
-    borderRadius: `${theme.radius.md} !important`,
-    boxShadow: `${theme.shadow.lg} !important`,
-    padding: '0 !important',
-    marginLeft: '4px !important',
-  },
-  '.cm-completionInfo.cm-completionInfo-left': {
-    marginRight: '4px !important',
-  },
-});
+// --- Component ---
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onTabDrawerClick, fontSize = 15 }) => {
+  const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
-  const editorTheme = useMemo(() => createEditorTheme(fontSize), [fontSize]);
+  const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
+  const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
+
+  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
+    container: {
+      display: 'flex',
+      flexDirection: 'column',
+      border: `1px solid ${theme.colors.border.primary}`,
+      borderRadius: theme.radius.md,
+      overflow: 'hidden',
+      height: '100%',
+      width: '100%'
+    },
+    editor: {
+      height: '100%',
+      width: '100%',
+      overflow: 'hidden',
+      minHeight: 0,
+      flex: 1,
+    }
+  }), [theme]);
+
+  const autocompleteTheme = useMemo(() => EditorView.theme({
+    '.cm-tooltip.cm-tooltip-autocomplete': {
+      border: `1px solid ${theme.colors.border.primary} !important`,
+      borderRadius: `${theme.radius.md} !important`,
+      backgroundColor: `${theme.colors.bg.secondary} !important`,
+      boxShadow: `${theme.shadow.lg} !important`,
+    },
+    '.cm-tooltip-autocomplete ul': {
+      fontFamily: `${theme.font.mono} !important`,
+      fontSize: `${theme.font.size.base} !important`,
+    },
+    '.cm-tooltip-autocomplete ul li': {
+      padding: '4px 10px !important',
+      borderBottom: '1px solid #ffffff08',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+      backgroundColor: `${theme.colors.bg.active} !important`,
+      color: `${theme.colors.text.primary} !important`,
+    },
+    '.cm-completionIcon': {
+      width: '1.2em !important',
+      textAlign: 'center',
+    },
+    '.cm-completionIcon-class::after': { content: '"◆"', color: theme.colors.accent.router },
+    '.cm-completionIcon-function::after': { content: '"ƒ"', color: theme.colors.accent.query },
+    '.cm-completionIcon-method::after': { content: '"ƒ"', color: theme.colors.accent.mutation },
+    '.cm-completionIcon-property::after': { content: '"●"', color: theme.colors.accent.danger },
+    '.cm-completionIcon-variable::after': { content: '"○"', color: theme.colors.text.muted },
+    '.cm-completionIcon-text::after': { content: '"T"', color: theme.colors.text.secondary },
+    '.cm-tooltip.cm-completionInfo': {
+      backgroundColor: `${theme.colors.bg.secondary} !important`,
+      border: `1px solid ${theme.colors.border.primary} !important`,
+      borderRadius: `${theme.radius.md} !important`,
+      boxShadow: `${theme.shadow.lg} !important`,
+      padding: '0 !important',
+      marginLeft: '4px !important',
+    },
+    '.cm-completionInfo.cm-completionInfo-left': {
+      marginRight: '4px !important',
+    },
+  }), [theme]);
 
   const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
     const variableTypes = new Map(
@@ -283,7 +288,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       const parseResult = parseCodeForTrpcCalls(code);
       const diagnostics: Diagnostic[] = [];
 
-      // Add parsing errors
       for (const parseError of parseResult.errors) {
         diagnostics.push({
           from: parseError.position.start,
@@ -293,11 +297,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         });
       }
 
-      // Validate tRPC calls
       if (parseResult.calls.length > 0) {
         const validationResult = validateCodeWithCache(code, parseResult.calls, schema, variableTypes);
 
-        // Add validation errors
         for (const error of validationResult.errors) {
           diagnostics.push({
             from: error.position.start,
@@ -308,7 +310,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           });
         }
 
-        // Add warnings
         for (const warning of validationResult.warnings) {
           diagnostics.push({
             from: warning.position.start,
@@ -325,11 +326,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   }, []);
 
   const trpcLinterExtension = React.useMemo(() => createTrpcLinter(schema, variables), [schema, variables, createTrpcLinter]);
+
   const formatSchemaForInfo = (schema: any): string => {
     if (!schema) return '';
-
     try {
-      // If it's a JSON schema, extract type information
       if (schema.type === 'object' && schema.properties) {
         const props = Object.entries(schema.properties)
           .map(([key, prop]: [string, any]) => {
@@ -345,7 +345,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     } catch (error) {
       console.warn('Error formatting schema:', error);
     }
-
     return 'any';
   };
 
@@ -377,7 +376,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
           boost: def.type === 'router' ? 80 : def.type === 'query' ? 60 : 40,
           apply,
-          info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
+          info: () => createProcedureInfoNode(key, def.type, theme, inputType, outputType),
         };
       });
     }
@@ -421,7 +420,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           type: def.type === 'router' ? 'class' : def.type === 'query' ? 'function' : 'method',
           boost: def.type === 'router' ? 80 : def.type === 'query' ? 60 : 40,
           apply,
-          info: () => createProcedureInfoNode(key, def.type, inputType, outputType),
+          info: () => createProcedureInfoNode(key, def.type, theme, inputType, outputType),
         };
       });
     } else if (routerDef) {
@@ -443,7 +442,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
               selection: { anchor: from + text.length - 1 }
             });
           },
-          info: () => createProcedureInfoNode(methodName, routerDef.type, inputType, outputType),
+          info: () => createProcedureInfoNode(methodName, routerDef.type, theme, inputType, outputType),
         }
       ];
     }
@@ -455,7 +454,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     const word = context.matchBefore(/\w*/);
     const text = context.state.doc.sliceString(0, context.pos);
 
-    // Find the LAST match of query( or mutate( before the cursor
     const regex = /trpc((?:\.\w+)+)\.(query|mutate)\(/g;
     let procedureMatch;
     let lastMatch = null;
@@ -468,15 +466,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       const procedureStart = lastMatch.index! + lastMatch[0].length;
       const afterProcedure = text.substring(procedureStart);
 
-      // Count parentheses taking into account new Date() and other functions
-      let parenCount = 1; // We start after the ( of query( or mutate(
+      let parenCount = 1;
       let inString = false;
       let stringChar = '';
 
       for (let i = 0; i < afterProcedure.length; i++) {
         const char = afterProcedure[i];
 
-        // Handle character strings
         if ((char === '"' || char === "'") && (i === 0 || afterProcedure[i - 1] !== '\\')) {
           if (!inString) {
             inString = true;
@@ -492,23 +488,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         if (char === '(') parenCount++;
         else if (char === ')') {
           parenCount--;
-          if (parenCount === 0) break; // query/mutate parentheses closed
+          if (parenCount === 0) break;
         }
       }
 
-      // If we are still within the query/mutate parentheses
       if (parenCount > 0) {
         const pathStr = lastMatch[1];
         const path = pathStr.substring(1).split('.');
 
-        // Get the inputSchema of the procedure
         let currentLevel = schema;
         for (let i = 0; i < path.length - 1; i++) {
           const segment = path[i];
           if (currentLevel[segment]?.type === 'router' && currentLevel[segment].children) {
             currentLevel = currentLevel[segment].children!;
           } else {
-            break; // Exit if we don't find the segment
+            break;
           }
         }
 
@@ -518,20 +512,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         if (procedureDef && procedureDef.type !== 'router' && 'inputSchema' in procedureDef && procedureDef.inputSchema) {
           const inputSchema = procedureDef.inputSchema;
 
-          // If the schema is an object, suggest the properties
-          // Build variable completions for use inside arguments
           const argVariableOptions = variables
             .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
             .map(v => ({
               label: v.key.trim(),
               type: 'constant',
-              info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
+              info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme),
               boost: 0,
             }));
 
           if (inputSchema.type === 'object' && inputSchema.properties) {
-            // Use the full document to detect braces and used keys,
-            // not just the text before cursor
             const fullText = context.state.doc.toString();
             const fullAfterProcedure = fullText.substring(procedureStart);
             const hasOpenBrace = fullAfterProcedure.includes('{');
@@ -559,7 +549,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                 ]
               };
             } else {
-              // Scan used keys in the full argument object, not just before cursor
               const usedKeys = new Set<string>();
               const braceStart = fullAfterProcedure.indexOf('{');
               if (braceStart !== -1) {
@@ -571,14 +560,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   scanPos++;
                 }
                 const objectContent = fullAfterProcedure.substring(braceStart + 1, scanPos - 1);
-                // Detect "key:" syntax (explicit property)
                 const propertyRegex = /(\w+)\s*:/g;
                 let propMatch;
                 while ((propMatch = propertyRegex.exec(objectContent)) !== null) {
                   usedKeys.add(propMatch[1]);
                 }
-                // Detect shorthand properties: standalone identifiers (e.g. {name} = {name: name})
-                // Split by comma and check each token for a bare identifier (no colon)
                 const tokens = objectContent.split(',');
                 for (const token of tokens) {
                   const trimmed = token.trim();
@@ -588,14 +574,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                 }
               }
 
-              // Detect if we need to add a comma before the new property
               const needsComma = (() => {
-                // Look for non-whitespace text before the cursor (in afterProcedure)
                 const beforeCursor = afterProcedure.trimEnd();
                 if (beforeCursor.length === 0) return false;
-
                 const lastChar = beforeCursor[beforeCursor.length - 1];
-                // If the last character is not a comma, { or [, we need a comma
                 return lastChar !== ',' && lastChar !== '{' && lastChar !== '[';
               })();
 
@@ -623,7 +605,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                     type: isRequired ? 'property' : 'text',
                     boost: 20,
                     apply,
-                    info: () => createPropertyInfoNode(key, type, isRequired, propSchema.description),
+                    info: () => createPropertyInfoNode(key, type, isRequired, theme, propSchema.description),
                   };
                 });
 
@@ -633,7 +615,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
               };
             }
           } else if (argVariableOptions.length > 0) {
-            // Non-object schema (string, number, etc.) — suggest variables as argument
             const from = word ? word.from : context.pos;
             return { from, options: argVariableOptions };
           }
@@ -650,8 +631,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       const endsWithDot = !!trpcPathMatch[2];
       const segments = pathStr ? pathStr.substring(1).split('.') : [];
 
-      // If text ends with a dot (e.g. "trpc.hello."), navigate to that segment
-      // If not (e.g. "trpc.h"), navigate to parent level and let CodeMirror filter by typed chars
       const path = endsWithDot
         ? (segments.length > 0 ? segments : [''])
         : (segments.length > 1 ? segments.slice(0, -1) : ['']);
@@ -664,20 +643,19 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       };
     }
 
-    // Add variable completions
     const variableOptions = (variables ?? [])
       .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
       .map(v => ({
         label: v.key.trim(),
         type: 'constant',
-        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)'),
+        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme),
       }));
 
     if (word && word.from < word.to) {
       return {
         from: word.from,
         options: [
-          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode() },
+          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode(theme) },
           ...variableOptions,
         ]
       };
@@ -687,7 +665,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       return {
         from: word ? word.from : context.pos,
         options: [
-          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode() },
+          { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode(theme) },
           ...variableOptions,
         ]
       };
@@ -701,7 +679,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     activateOnTyping: true,
     defaultKeymap: true,
     maxRenderedOptions: 100,
-  }), [schema, variables]);
+  }), [schema, variables, theme]);
 
   const dotTriggerExtension = EditorView.updateListener.of((update) => {
     if (!update.docChanged) return;
@@ -750,7 +728,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     return calls;
   };
 
-  // Cache trpc call lines: Map<lineFrom, callCode>
   let cachedText = '';
   let cachedCallLines = new Map<number, string>();
 
@@ -825,7 +802,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       <CodeMirror
         ref={editorRef}
         value={value}
-        theme={vscodeDark}
+        theme={cmTheme}
         basicSetup={{ lineNumbers: false, foldGutter: false }}
         extensions={[
           javascript({ typescript: true }),
