@@ -238,6 +238,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         <div style={{ ...styles.panel, width: `${leftPct}%` }}>
           {activeTab && (
             <CodeEditor
+              key={activeTab.id}
               value={activeTab.content}
               onChange={handleCodeChange}
               schema={schema}
