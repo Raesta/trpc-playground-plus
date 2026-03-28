@@ -145,9 +145,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
         {onFormat && (
           <ToolbarButton title="Format code (Shift+Alt+F)" onClick={onFormat} variant="pill">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="7" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
+              <path d="M15 4V2" />
+              <path d="M15 16v-2" />
+              <path d="M8 9h2" />
+              <path d="M20 9h2" />
+              <path d="M17.8 11.8 19 13" />
+              <path d="M15 9h0" />
+              <path d="M17.8 6.2 19 5" />
+              <path d="M3 21l9-9" />
+              <path d="M12.2 6.2 11 5" />
             </svg>
           </ToolbarButton>
         )}
