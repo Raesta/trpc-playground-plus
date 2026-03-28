@@ -7,6 +7,7 @@ import { useTheme } from '../ThemeContext';
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
   onTabDrawerClick?: () => void;
+  onFormat?: () => void;
   children?: React.ReactNode;
 }
 
@@ -73,7 +74,7 @@ const ToolbarButton: React.FC<{
   );
 };
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, children }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, onFormat, children }) => {
   const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
 
@@ -141,6 +142,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onFormat && (
+          <ToolbarButton title="Format code (Shift+Alt+F)" onClick={onFormat} variant="pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="7" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </ToolbarButton>
+        )}
         <ToolbarButton title="Fold all" onClick={handleFoldAll} variant="pill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="4 14 12 6 20 14" />

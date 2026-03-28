@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { getCodeMirrorTheme } from '../editorTheme';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
@@ -13,6 +13,7 @@ import { validateCodeWithCache, resolveVariableType } from '../utils/zod-validat
 import { createEditorTheme } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
 import { useTheme } from '../ThemeContext';
+import { formatKeymap, formatDocument } from '../utils/formatter';
 import { ThemeConfig } from '../theme';
 
 interface CodeEditorProps {
@@ -796,15 +797,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     },
   });
 
+  const handleFormat = useCallback(() => {
+    const view = editorRef.current?.view;
+    if (view) formatDocument(view);
+  }, []);
+
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} onTabDrawerClick={onTabDrawerClick} />
+      <EditorToolbar editorRef={editorRef} onTabDrawerClick={onTabDrawerClick} onFormat={handleFormat} />
       <CodeMirror
         ref={editorRef}
         value={value}
         theme={cmTheme}
         basicSetup={{ lineNumbers: false, foldGutter: false }}
         extensions={[
+          formatKeymap,
           javascript({ typescript: true }),
           editorTheme,
           playLineNumbersExtension,
