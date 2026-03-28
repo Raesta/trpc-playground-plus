@@ -52,6 +52,13 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
     },
     input: {
       width: 'calc(100% - 24px)',
+      background: theme.colors.bg.secondary,
+      color: theme.colors.text.primary,
+      border: `1px solid ${theme.colors.border.primary}`,
+      borderRadius: theme.radius.sm,
+      fontSize: theme.font.size.md,
+      padding: '2px 4px',
+      outline: 'none',
     },
     closeButton: {
       background: 'none',
