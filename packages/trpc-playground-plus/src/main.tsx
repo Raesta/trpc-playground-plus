@@ -250,24 +250,27 @@ const Playground = () => {
             localStorage.setItem('trpc-playground-tabs', JSON.stringify(importedTabs));
           }
 
-          if (importedGlobalHeaders && Array.isArray(importedGlobalHeaders) && importedGlobalHeaders.length > 0) {
-            setGlobalHeaders(importedGlobalHeaders);
-            localStorage.setItem('trpc-playground-headers', JSON.stringify(importedGlobalHeaders));
-          }
+          const resolvedHeaders = (importedGlobalHeaders && Array.isArray(importedGlobalHeaders))
+            ? importedGlobalHeaders
+            : [];
+          setGlobalHeaders(resolvedHeaders);
+          localStorage.setItem('trpc-playground-headers', JSON.stringify(resolvedHeaders));
 
-          if (importedGlobalVariables && Array.isArray(importedGlobalVariables) && importedGlobalVariables.length > 0) {
-            const migratedVars = importedGlobalVariables.map(ensureVariableType);
-            setGlobalVariables(migratedVars);
-            localStorage.setItem('trpc-playground-variables', JSON.stringify(migratedVars));
-          }
+          const resolvedVars = (importedGlobalVariables && Array.isArray(importedGlobalVariables))
+            ? importedGlobalVariables.map(ensureVariableType)
+            : [];
+          setGlobalVariables(resolvedVars);
+          localStorage.setItem('trpc-playground-variables', JSON.stringify(resolvedVars));
 
           if (importedData.settings && typeof importedData.settings === 'object') {
             saveSettings(importedData.settings);
-            const merged = loadSettings();
-            setSplitPosition(merged.splitPosition);
-            setFontSize(merged.fontSize);
-            setRequestTimeout(merged.requestTimeout);
+          } else {
+            localStorage.removeItem('trpc-playground-settings');
           }
+          const merged = loadSettings();
+          setSplitPosition(merged.splitPosition);
+          setFontSize(merged.fontSize);
+          setRequestTimeout(merged.requestTimeout);
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
         }
