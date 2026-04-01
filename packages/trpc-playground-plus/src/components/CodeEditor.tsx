@@ -283,14 +283,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     '.cm-completionIcon-property': {
       backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.danger}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='4 7 4 4 20 4 20 7'/><line x1='9' y1='20' x2='15' y2='20'/><line x1='12' y1='4' x2='12' y2='20'/></svg>`)}")`,
     },
-    '.cm-completionIcon-variable': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.muted}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7c0 0 2-2 4-2s4 2 4 2 2 2 4 2 4-2 4-2'/><path d='M4 17c0 0 2-2 4-2s4 2 4 2 2 2 4 2 4-2 4-2'/><line x1='4' y1='7' x2='4' y2='17'/><line x1='20' y1='7' x2='20' y2='17'/></svg>`)}")`,
+    '.cm-completionIcon-variable-global': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-variable-local': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
     },
     '.cm-completionIcon-text': {
       backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 7h10'/><path d='M12 7v10'/><path d='M9 17h6'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-constant': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><line x1='9' y1='12' x2='15' y2='12'/></svg>`)}")`,
     },
     '.cm-tooltip.cm-completionInfo': {
       backgroundColor: `${theme.colors.bg.secondary} !important`,
@@ -545,7 +545,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             .filter(value => value.key.trim() && value.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value.key.trim()))
             .map(value => ({
               label: value.key.trim(),
-              type: 'constant',
+              type: value.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
               info: () => createVariableInfoNode(value.key.trim(), value.type || resolveVariableType(value.value), value.value || '(empty)', theme, value.scope),
               boost: 0,
             }));
@@ -676,7 +676,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
       .map(v => ({
         label: v.key.trim(),
-        type: 'constant',
+        type: v.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
         info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme, v.scope),
       }));
 
