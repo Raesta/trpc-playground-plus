@@ -247,7 +247,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       fontSize: `${theme.font.size.base} !important`,
     },
     '.cm-tooltip-autocomplete ul li': {
-      padding: '4px 10px !important',
+      padding: '4px 2px 4px 4px !important',
       borderBottom: '1px solid #ffffff08',
     },
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
@@ -255,15 +255,40 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       color: `${theme.colors.text.primary} !important`,
     },
     '.cm-completionIcon': {
-      width: '1.2em !important',
-      textAlign: 'center',
+      width: '18px !important',
+      height: '16px !important',
+      display: 'inline-block !important',
+      verticalAlign: 'middle',
+      backgroundSize: '14px 14px',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center center',
+      padding: '0 !important',
+      margin: '0 4px 0 0 !important',
+      marginLeft: '0 !important',
+      paddingLeft: '0 !important',
     },
-    '.cm-completionIcon-class::after': { content: '"◆"', color: theme.colors.accent.router },
-    '.cm-completionIcon-function::after': { content: '"ƒ"', color: theme.colors.accent.query },
-    '.cm-completionIcon-method::after': { content: '"ƒ"', color: theme.colors.accent.mutation },
-    '.cm-completionIcon-property::after': { content: '"●"', color: theme.colors.accent.danger },
-    '.cm-completionIcon-variable::after': { content: '"○"', color: theme.colors.text.muted },
-    '.cm-completionIcon-text::after': { content: '"T"', color: theme.colors.text.secondary },
+    '.cm-completionIcon::after': { content: '"" !important' },
+    '.cm-completionIcon-class': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.router}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 21V9a9 9 0 0 0 9 9'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-function': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='12' cy='12' r='6'/><line x1='12' y1='6' x2='12' y2='18'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-method': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='9' cy='12' r='5'/><circle cx='15' cy='12' r='5'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-property': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.danger}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='4 7 4 4 20 4 20 7'/><line x1='9' y1='20' x2='15' y2='20'/><line x1='12' y1='4' x2='12' y2='20'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-variable': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.muted}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 7c0 0 2-2 4-2s4 2 4 2 2 2 4 2 4-2 4-2'/><path d='M4 17c0 0 2-2 4-2s4 2 4 2 2 2 4 2 4-2 4-2'/><line x1='4' y1='7' x2='4' y2='17'/><line x1='20' y1='7' x2='20' y2='17'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-text': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 7h10'/><path d='M12 7v10'/><path d='M9 17h6'/></svg>`)}")`,
+    },
+    '.cm-completionIcon-constant': {
+      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><line x1='9' y1='12' x2='15' y2='12'/></svg>`)}")`,
+    },
     '.cm-tooltip.cm-completionInfo': {
       backgroundColor: `${theme.colors.bg.secondary} !important`,
       border: `1px solid ${theme.colors.border.primary} !important`,
