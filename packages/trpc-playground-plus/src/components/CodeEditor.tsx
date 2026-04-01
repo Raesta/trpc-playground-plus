@@ -2,7 +2,7 @@ import React, { useRef, useMemo, useCallback } from 'react';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { getCodeMirrorTheme } from '../editorTheme';
 import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
-import { RouterSchema, Variable } from '../types';
+import { RouterSchema, Variable, Scope } from '../types';
 import { Decoration, EditorView, WidgetType, GutterMarker, gutter, ViewUpdate } from '@codemirror/view';
 import { RangeSet, RangeSetBuilder } from '@codemirror/state';
 import { foldGutter } from '@codemirror/language';
@@ -178,6 +178,7 @@ function createVariableInfoNode(
   type: string,
   value: string,
   theme: ThemeConfig,
+  scope?: Scope,
 ): HTMLElement {
   const container = document.createElement('div');
   Object.assign(container.style, { padding: '8px 10px', maxWidth: '300px', lineHeight: '1.5' });
@@ -190,7 +191,9 @@ function createVariableInfoNode(
   Object.assign(nameEl.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(nameEl);
 
-  header.appendChild(createBadge('variable', theme.colors.accent.info, theme));
+  const scopeLabel = scope === Scope.LOCAL ? Scope.LOCAL : Scope.GLOBAL;
+  const scopeColor = scope === Scope.LOCAL ? theme.colors.accent.mutation : theme.colors.accent.query;
+  header.appendChild(createBadge(scopeLabel, scopeColor, theme));
   header.appendChild(createBadge(type, FIXED_TYPE_COLORS[type] || theme.colors.text.muted, theme));
   container.appendChild(header);
 
@@ -305,8 +308,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
     const variableTypes = new Map(
       variables
-        .filter(v => v.enabled && v.key.trim())
-        .map(v => [v.key.trim(), resolveVariableType(v.value)] as const)
+        .filter(value => value.enabled && value.key.trim())
+        .map(value => [value.key.trim(), resolveVariableType(value.value)] as const)
     );
 
     return linter((view) => {
@@ -539,11 +542,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           const inputSchema = procedureDef.inputSchema;
 
           const argVariableOptions = variables
-            .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
-            .map(v => ({
-              label: v.key.trim(),
+            .filter(value => value.key.trim() && value.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value.key.trim()))
+            .map(value => ({
+              label: value.key.trim(),
               type: 'constant',
-              info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme),
+              info: () => createVariableInfoNode(value.key.trim(), value.type || resolveVariableType(value.value), value.value || '(empty)', theme, value.scope),
               boost: 0,
             }));
 
@@ -674,7 +677,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       .map(v => ({
         label: v.key.trim(),
         type: 'constant',
-        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme),
+        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme, v.scope),
       }));
 
     if (word && word.from < word.to) {

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
 import TabCodeEditor from './components/TabCodeEditor'
 import { ExportButton } from './components/ExportButton'
-import { Tab, Variable, Header, VariableType } from './types'
+import { Tab, Variable, Header, VariableType, Scope } from './types'
 import VarsHeadersDrawer from './components/VarsHeadersDrawer'
 import Settings from './components/Settings'
 import { getTheme } from './theme'
@@ -42,13 +42,16 @@ function coerceVariableValue(raw: string, type: VariableType): any {
   }
 }
 
-function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): T[] {
-  const enabledLocalKeys = new Set(locals.filter(l => l.key.trim() && l.enabled).map(l => l.key.trim()));
-  return [...globals.filter(g => g.key.trim() && !enabledLocalKeys.has(g.key.trim())), ...locals];
+function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): (T & { scope: Scope })[] {
+  const enabledLocalKeys = new Set(locals.filter(local => local.key.trim() && local.enabled).map(local => local.key.trim()));
+  return [
+    ...globals.filter(global => global.key.trim() && !enabledLocalKeys.has(global.key.trim())).map(global => ({ ...global, scope: Scope.GLOBAL })),
+    ...locals.map(local => ({ ...local, scope: Scope.LOCAL })),
+  ];
 }
 
-function ensureVariableType(v: any): Variable {
-  return { ...v, type: v.type || 'string' };
+function ensureVariableType(value: any): Variable {
+  return { ...value, type: value.type || 'string' };
 }
 
 function ensureTabFields(tab: any): Tab {

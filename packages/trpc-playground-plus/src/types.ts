@@ -48,6 +48,12 @@ export interface Header {
   enabled: boolean;
 }
 
+export const Scope = {
+  GLOBAL: 'global',
+  LOCAL: 'local',
+} as const;
+export type Scope = typeof Scope[keyof typeof Scope];
+
 export type VariableType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'json';
 
 export interface Variable {
@@ -55,6 +61,7 @@ export interface Variable {
   value: string;
   type: VariableType;
   enabled: boolean;
+  scope?: Scope;
 }
 
 export type ThemeMode = 'dark' | 'light';
