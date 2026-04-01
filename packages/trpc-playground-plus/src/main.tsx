@@ -11,6 +11,7 @@ import { ThemeProvider } from './ThemeContext'
 import { useTheme } from './ThemeContext'
 import { loadSettings, saveSettings } from './settings'
 import { validateVariableValue } from './utils/variable-validation'
+import { getStorageKey } from './utils/storage-keys'
 
 interface RouterSchema {
   [key: string]: {
@@ -24,6 +25,7 @@ interface PlaygroundConfig {
   transformer?: 'superjson';
   endpoints: string[];
   schema: RouterSchema;
+  projectKey?: string;
 }
 
 function coerceVariableValue(raw: string, type: VariableType): any {
@@ -74,8 +76,8 @@ const Playground = () => {
 
   const handleSplitChange = useCallback((pct: number) => {
     setSplitPosition(pct);
-    saveSettings({ splitPosition: pct });
-  }, []);
+    saveSettings({ splitPosition: pct }, config?.projectKey);
+  }, [config?.projectKey]);
 
   const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
     if (partial.fontSize !== undefined) {
@@ -84,13 +86,13 @@ const Playground = () => {
     if (partial.requestTimeout !== undefined) {
       setRequestTimeout(partial.requestTimeout);
     }
-    saveSettings(partial);
-  }, []);
+    saveSettings(partial, config?.projectKey);
+  }, [config?.projectKey]);
 
   const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Header[], updatedVariables: Variable[]) => {
-    localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
-    localStorage.setItem('trpc-playground-headers', JSON.stringify(updatedHeaders));
-    localStorage.setItem('trpc-playground-variables', JSON.stringify(updatedVariables));
+    localStorage.setItem(getStorageKey('tabs', config?.projectKey), JSON.stringify(updatedTabs));
+    localStorage.setItem(getStorageKey('headers', config?.projectKey), JSON.stringify(updatedHeaders));
+    localStorage.setItem(getStorageKey('variables', config?.projectKey), JSON.stringify(updatedVariables));
   };
 
   const handleUpdateTabs = (newTabs: Tab[]) => {
@@ -131,9 +133,9 @@ const Playground = () => {
         const { defaultTabs, defaultHeaders, ...rest } = data;
         setConfig(rest);
 
-        const savedTabs = localStorage.getItem('trpc-playground-tabs');
-        const savedHeaders = localStorage.getItem('trpc-playground-headers');
-        const savedVariables = localStorage.getItem('trpc-playground-variables');
+        const savedTabs = localStorage.getItem(getStorageKey('tabs', rest.projectKey));
+        const savedHeaders = localStorage.getItem(getStorageKey('headers', rest.projectKey));
+        const savedVariables = localStorage.getItem(getStorageKey('variables', rest.projectKey));
 
         if (savedTabs) {
           const parsed = JSON.parse(savedTabs);
@@ -154,6 +156,14 @@ const Playground = () => {
       })
       .catch(err => console.error('Error loading configuration:', err));
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    const s = loadSettings(config.projectKey);
+    setSplitPosition(s.splitPosition);
+    setFontSize(s.fontSize);
+    setRequestTimeout(s.requestTimeout);
+  }, [config]);
 
   if (!config) {
     return <div>Loading playground...</div>;
@@ -240,6 +250,13 @@ const Playground = () => {
             return;
           }
 
+          if (importedData.projectKey && config?.projectKey && importedData.projectKey !== config.projectKey) {
+            const proceed = confirm(`This export is from project "${importedData.projectKey}" but you are in "${config.projectKey}". Import anyway?`);
+            if (!proceed) return;
+          }
+
+          const projectkey = config?.projectKey;
+
           const importedTabs = importedData.tabs.map((tab: any, index: number) => ensureTabFields({
             ...tab,
             isActive: index === 0,
@@ -247,27 +264,27 @@ const Playground = () => {
 
           if (importedTabs.length > 0) {
             setTabs(importedTabs);
-            localStorage.setItem('trpc-playground-tabs', JSON.stringify(importedTabs));
+            localStorage.setItem(getStorageKey('tabs', projectkey), JSON.stringify(importedTabs));
           }
 
           const resolvedHeaders = (importedGlobalHeaders && Array.isArray(importedGlobalHeaders))
             ? importedGlobalHeaders
             : [];
           setGlobalHeaders(resolvedHeaders);
-          localStorage.setItem('trpc-playground-headers', JSON.stringify(resolvedHeaders));
+          localStorage.setItem(getStorageKey('headers', projectkey), JSON.stringify(resolvedHeaders));
 
           const resolvedVars = (importedGlobalVariables && Array.isArray(importedGlobalVariables))
             ? importedGlobalVariables.map(ensureVariableType)
             : [];
           setGlobalVariables(resolvedVars);
-          localStorage.setItem('trpc-playground-variables', JSON.stringify(resolvedVars));
+          localStorage.setItem(getStorageKey('variables', projectkey), JSON.stringify(resolvedVars));
 
           if (importedData.settings && typeof importedData.settings === 'object') {
-            saveSettings(importedData.settings);
+            saveSettings(importedData.settings, projectkey);
           } else {
-            localStorage.removeItem('trpc-playground-settings');
+            localStorage.removeItem(getStorageKey('settings', projectkey));
           }
-          const merged = loadSettings();
+          const merged = loadSettings(projectkey);
           setSplitPosition(merged.splitPosition);
           setFontSize(merged.fontSize);
           setRequestTimeout(merged.requestTimeout);
@@ -320,14 +337,14 @@ const Playground = () => {
           side="left"
         />
       )}
-      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize, theme: loadSettings().theme, requestTimeout }} onSettingsChange={handleSettingsChange} />
+      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout }} onSettingsChange={handleSettingsChange} />
       <div style={{ padding: 10, fontFamily: theme.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: theme.colors.text.secondary, fontSize: theme.font.size.md }}>
             Connected to : <code style={{ color: theme.colors.text.primary, backgroundColor: theme.colors.bg.code, padding: '2px 6px', borderRadius: theme.radius.sm, fontFamily: theme.font.mono }}>{config.trpcEndpoint}</code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} globalHeaders={globalHeaders} settings={loadSettings()} globalVariables={globalVariables} />
+            <ExportButton tabs={tabs} globalHeaders={globalHeaders} settings={loadSettings(config?.projectKey)} globalVariables={globalVariables} projectKey={config?.projectKey} />
             <button
               onClick={importStructure}
               style={btnStyle}

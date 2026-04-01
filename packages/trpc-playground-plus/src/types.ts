@@ -30,6 +30,7 @@ export interface PlaygroundConfig {
   trpcUrl: string;
   endpoints: Array<string>;
   schema: RouterSchema;
+  projectKey?: string;
 }
 
 export interface Tab {

@@ -132,6 +132,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   router,
   playgroundEndpoint = '/playground',
   defaultData = {},
+  projectKey,
 }: {
   app: FastifyInstance;
   trpcEndpoint: string;
@@ -139,6 +140,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   transformer?: 'superjson';
   playgroundEndpoint?: string;
   defaultData?: ExportData;
+  projectKey?: string;
 }) {
   if (!app || typeof app !== 'object') {
     throw new Error('Invalid app parameter: app must be a FastifyInstance');
@@ -186,6 +188,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
     reply.send({
       trpcEndpoint,
       transformer,
+      projectKey,
       endpoints: Object.keys(router._def.procedures),
       schema: stripZodSchemasForClient(routerStructure),
       defaultTabs: defaultData?.tabs || [{ id: 'example-tab-1', title: 'Example 1', content: 'trpc.hello.query({ name: \'monde test\' })', isActive: true }],

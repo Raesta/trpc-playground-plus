@@ -7,9 +7,10 @@ interface ExportButtonProps {
   globalHeaders: Array<Header>;
   settings: PlaygroundSettings;
   globalVariables: Array<Variable>;
+  projectKey?: string;
 }
 
-export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }: ExportButtonProps) => {
+export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables, projectKey }: ExportButtonProps) => {
   const theme = useTheme();
 
   const styles: Record<string, React.CSSProperties> = useMemo(() => ({
@@ -34,6 +35,7 @@ export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }:
       globalHeaders,
       settings,
       globalVariables,
+      projectKey,
       createdAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -41,7 +43,7 @@ export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables }:
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = `trpc-playground-tabs-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `trpc-playground${projectKey ? `-${projectKey}` : ''}-tabs-${new Date().toISOString().split('T')[0]}.json`;
 
     document.body.appendChild(link);
     link.click();
