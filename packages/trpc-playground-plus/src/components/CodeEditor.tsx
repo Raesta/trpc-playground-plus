@@ -547,7 +547,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
               label: value.key.trim(),
               type: value.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
               info: () => createVariableInfoNode(value.key.trim(), value.type || resolveVariableType(value.value), value.value || '(empty)', theme, value.scope),
-              boost: 0,
+              boost: value.scope === Scope.GLOBAL ? -10 : -20,
             }));
 
           if (inputSchema.type === 'object' && inputSchema.properties) {
@@ -678,6 +678,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         label: v.key.trim(),
         type: v.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
         info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme, v.scope),
+        boost: v.scope === Scope.GLOBAL ? -10 : -20,
       }));
 
     if (word && word.from < word.to) {
