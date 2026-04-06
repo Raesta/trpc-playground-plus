@@ -1,17 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import ReactDOM from 'react-dom/client'
-import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
-import TabCodeEditor from './components/TabCodeEditor'
-import { ExportButton } from './components/ExportButton'
-import { Tab, Variable, Header, VariableType, Scope } from './types'
-import VarsHeadersDrawer from './components/VarsHeadersDrawer'
-import Settings from './components/Settings'
-import { getTheme } from './theme'
-import { ThemeProvider } from './ThemeContext'
-import { useTheme } from './ThemeContext'
-import { loadSettings, saveSettings } from './settings'
-import { validateVariableValue } from './utils/variable-validation'
-import { getStorageKey } from './utils/storage-keys'
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ReactDOM from 'react-dom/client';
+import { ExportButton } from './components/ExportButton';
+import Settings from './components/Settings';
+import TabCodeEditor from './components/TabCodeEditor';
+import VarsHeadersDrawer from './components/VarsHeadersDrawer';
+import { loadSettings, saveSettings } from './settings';
+import { ThemeProvider, useTheme } from './ThemeContext';
+import { getTheme } from './theme';
+import { type Header, Scope, type Tab, type Variable, type VariableType } from './types';
+import { getStorageKey } from './utils/storage-keys';
+import { createDynamicTRPCClient } from './utils/trpc/trpc-client';
+import { validateVariableValue } from './utils/variable-validation';
 
 interface RouterSchema {
   [key: string]: {
@@ -30,23 +29,36 @@ interface PlaygroundConfig {
 
 function coerceVariableValue(raw: string, type: VariableType): any {
   switch (type) {
-    case 'string':  return raw;
-    case 'number':  { const n = Number(raw); return isNaN(n) ? 0 : n; }
-    case 'boolean': return raw === 'true' || raw === '1';
-    case 'null':    return null;
+    case 'string':
+      return raw;
+    case 'number': {
+      const n = Number(raw);
+      return Number.isNaN(n) ? 0 : n;
+    }
+    case 'boolean':
+      return raw === 'true' || raw === '1';
+    case 'null':
+      return null;
     case 'object':
     case 'array':
     case 'json':
-      try { return JSON.parse(raw); }
-      catch { return type === 'array' ? [] : {}; }
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return type === 'array' ? [] : {};
+      }
   }
 }
 
 function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): (T & { scope: Scope })[] {
-  const enabledLocalKeys = new Set(locals.filter(local => local.key.trim() && local.enabled).map(local => local.key.trim()));
+  const enabledLocalKeys = new Set(
+    locals.filter((local) => local.key.trim() && local.enabled).map((local) => local.key.trim()),
+  );
   return [
-    ...globals.filter(global => global.key.trim() && !enabledLocalKeys.has(global.key.trim())).map(global => ({ ...global, scope: Scope.GLOBAL })),
-    ...locals.map(local => ({ ...local, scope: Scope.LOCAL })),
+    ...globals
+      .filter((global) => global.key.trim() && !enabledLocalKeys.has(global.key.trim()))
+      .map((global) => ({ ...global, scope: Scope.GLOBAL })),
+    ...locals.map((local) => ({ ...local, scope: Scope.LOCAL })),
   ];
 }
 
@@ -69,28 +81,36 @@ const Playground = () => {
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [globalDrawerOpen, setGlobalDrawerOpen] = useState(false);
-  const [globalHeaders, setGlobalHeaders] = useState<Header[]>([{key: '', value: '', enabled: true}]);
-  const [globalVariables, setGlobalVariables] = useState<Variable[]>([{ key: '', value: '', type: 'string', enabled: true }]);
+  const [globalHeaders, setGlobalHeaders] = useState<Header[]>([{ key: '', value: '', enabled: true }]);
+  const [globalVariables, setGlobalVariables] = useState<Variable[]>([
+    { key: '', value: '', type: 'string', enabled: true },
+  ]);
   const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
   const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const handleSplitChange = useCallback((pct: number) => {
-    setSplitPosition(pct);
-    saveSettings({ splitPosition: pct }, config?.projectKey);
-  }, [config?.projectKey]);
+  const handleSplitChange = useCallback(
+    (pct: number) => {
+      setSplitPosition(pct);
+      saveSettings({ splitPosition: pct }, config?.projectKey);
+    },
+    [config?.projectKey],
+  );
 
-  const handleSettingsChange = useCallback((partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
-    if (partial.fontSize !== undefined) {
-      setFontSize(partial.fontSize);
-    }
-    if (partial.requestTimeout !== undefined) {
-      setRequestTimeout(partial.requestTimeout);
-    }
-    saveSettings(partial, config?.projectKey);
-  }, [config?.projectKey]);
+  const handleSettingsChange = useCallback(
+    (partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
+      if (partial.fontSize !== undefined) {
+        setFontSize(partial.fontSize);
+      }
+      if (partial.requestTimeout !== undefined) {
+        setRequestTimeout(partial.requestTimeout);
+      }
+      saveSettings(partial, config?.projectKey);
+    },
+    [config?.projectKey],
+  );
 
   const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Header[], updatedVariables: Variable[]) => {
     localStorage.setItem(getStorageKey('tabs', config?.projectKey), JSON.stringify(updatedTabs));
@@ -114,25 +134,21 @@ const Playground = () => {
   };
 
   const handleUpdateActiveTabVariables = (newVariables: Variable[]) => {
-    const newTabs = tabs.map(tab =>
-      tab.isActive ? { ...tab, variables: newVariables } : tab
-    );
+    const newTabs = tabs.map((tab) => (tab.isActive ? { ...tab, variables: newVariables } : tab));
     setTabs(newTabs);
     saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
   const handleUpdateActiveTabHeaders = (newHeaders: Header[]) => {
-    const newTabs = tabs.map(tab =>
-      tab.isActive ? { ...tab, headers: newHeaders } : tab
-    );
+    const newTabs = tabs.map((tab) => (tab.isActive ? { ...tab, headers: newHeaders } : tab));
     setTabs(newTabs);
     saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
   useEffect(() => {
     fetch('/playground/config')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const { defaultTabs, defaultHeaders, ...rest } = data;
         setConfig(rest);
 
@@ -157,7 +173,7 @@ const Playground = () => {
           setGlobalVariables(JSON.parse(savedVariables).map(ensureVariableType));
         }
       })
-      .catch(err => console.error('Error loading configuration:', err));
+      .catch((err) => console.error('Error loading configuration:', err));
   }, []);
 
   useEffect(() => {
@@ -172,13 +188,13 @@ const Playground = () => {
     return <div>Loading playground...</div>;
   }
 
-  const activeTab = tabs.find(tab => tab.isActive);
+  const activeTab = tabs.find((tab) => tab.isActive);
   const mergedVariables = mergeByKey(globalVariables, activeTab?.variables ?? []);
   const mergedHeaders = mergeByKey(globalHeaders, activeTab?.headers ?? []);
 
   const getHeadersObject = () => {
     const result: Record<string, string> = {};
-    mergedHeaders.forEach(h => {
+    mergedHeaders.forEach((h) => {
       if (h.key.trim() && h.value.trim() && h.enabled) {
         result[h.key.trim()] = h.value.trim();
       }
@@ -187,22 +203,34 @@ const Playground = () => {
   };
 
   const executeSpecificCode = async (specificCode: string) => {
-    setResult('')
+    setResult('');
     setIsLoading(true);
     const headersObject = getHeadersObject();
-    const trpcClient = createDynamicTRPCClient({ trpcUrl: config.trpcEndpoint, transformer: config.transformer, headers: headersObject });
+    const trpcClient = createDynamicTRPCClient({
+      trpcUrl: config.trpcEndpoint,
+      transformer: config.transformer,
+      headers: headersObject,
+    });
 
     try {
       const varNames: string[] = [];
       const varValues: any[] = [];
-      mergedVariables.forEach(v => {
-        if (v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()) && !validateVariableValue(v.value, v.type || 'string')) {
+      mergedVariables.forEach((v) => {
+        if (
+          v.key.trim() &&
+          v.enabled &&
+          /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()) &&
+          !validateVariableValue(v.value, v.type || 'string')
+        ) {
           varNames.push(v.key.trim());
           varValues.push(coerceVariableValue(v.value, v.type || 'string'));
         }
       });
 
-      const executeFunction = new Function('trpc', ...varNames, `
+      const executeFunction = new Function(
+        'trpc',
+        ...varNames,
+        `
         return (async () => {
           try {
             return await ${specificCode};
@@ -210,15 +238,22 @@ const Playground = () => {
             return { error };
           }
         })();
-      `);
+      `,
+      );
 
       const resultPromise = executeFunction(trpcClient, ...varValues);
-      const result = requestTimeout > 0
-        ? await Promise.race([
-            resultPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error(`Request timed out after ${requestTimeout / 1000}s`)), requestTimeout))
-          ])
-        : await resultPromise;
+      const result =
+        requestTimeout > 0
+          ? await Promise.race([
+              resultPromise,
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(new Error(`Request timed out after ${requestTimeout / 1000}s`)),
+                  requestTimeout,
+                ),
+              ),
+            ])
+          : await resultPromise;
 
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
@@ -254,31 +289,35 @@ const Playground = () => {
           }
 
           if (importedData.projectKey && config?.projectKey && importedData.projectKey !== config.projectKey) {
-            const proceed = confirm(`This export is from project "${importedData.projectKey}" but you are in "${config.projectKey}". Import anyway?`);
+            const proceed = confirm(
+              `This export is from project "${importedData.projectKey}" but you are in "${config.projectKey}". Import anyway?`,
+            );
             if (!proceed) return;
           }
 
           const projectkey = config?.projectKey;
 
-          const importedTabs = importedData.tabs.map((tab: any, index: number) => ensureTabFields({
-            ...tab,
-            isActive: index === 0,
-          }));
+          const importedTabs = importedData.tabs.map((tab: any, index: number) =>
+            ensureTabFields({
+              ...tab,
+              isActive: index === 0,
+            }),
+          );
 
           if (importedTabs.length > 0) {
             setTabs(importedTabs);
             localStorage.setItem(getStorageKey('tabs', projectkey), JSON.stringify(importedTabs));
           }
 
-          const resolvedHeaders = (importedGlobalHeaders && Array.isArray(importedGlobalHeaders))
-            ? importedGlobalHeaders
-            : [];
+          const resolvedHeaders =
+            importedGlobalHeaders && Array.isArray(importedGlobalHeaders) ? importedGlobalHeaders : [];
           setGlobalHeaders(resolvedHeaders);
           localStorage.setItem(getStorageKey('headers', projectkey), JSON.stringify(resolvedHeaders));
 
-          const resolvedVars = (importedGlobalVariables && Array.isArray(importedGlobalVariables))
-            ? importedGlobalVariables.map(ensureVariableType)
-            : [];
+          const resolvedVars =
+            importedGlobalVariables && Array.isArray(importedGlobalVariables)
+              ? importedGlobalVariables.map(ensureVariableType)
+              : [];
           setGlobalVariables(resolvedVars);
           localStorage.setItem(getStorageKey('variables', projectkey), JSON.stringify(resolvedVars));
 
@@ -340,21 +379,52 @@ const Playground = () => {
           side="left"
         />
       )}
-      <Settings open={settingsOpen} setOpen={setSettingsOpen} settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout }} onSettingsChange={handleSettingsChange} />
+      <Settings
+        open={settingsOpen}
+        setOpen={setSettingsOpen}
+        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout }}
+        onSettingsChange={handleSettingsChange}
+      />
       <div style={{ padding: 10, fontFamily: theme.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: theme.colors.text.secondary, fontSize: theme.font.size.md }}>
-            Connected to : <code style={{ color: theme.colors.text.primary, backgroundColor: theme.colors.bg.code, padding: '2px 6px', borderRadius: theme.radius.sm, fontFamily: theme.font.mono }}>{config.trpcEndpoint}</code>
+            Connected to :{' '}
+            <code
+              style={{
+                color: theme.colors.text.primary,
+                backgroundColor: theme.colors.bg.code,
+                padding: '2px 6px',
+                borderRadius: theme.radius.sm,
+                fontFamily: theme.font.mono,
+              }}
+            >
+              {config.trpcEndpoint}
+            </code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} globalHeaders={globalHeaders} settings={loadSettings(config?.projectKey)} globalVariables={globalVariables} projectKey={config?.projectKey} />
+            <ExportButton
+              tabs={tabs}
+              globalHeaders={globalHeaders}
+              settings={loadSettings(config?.projectKey)}
+              globalVariables={globalVariables}
+              projectKey={config?.projectKey}
+            />
             <button
               onClick={importStructure}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 10 12 15 7 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -364,10 +434,19 @@ const Playground = () => {
             <button
               onClick={() => setGlobalDrawerOpen(!globalDrawerOpen)}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="10" />
                 <line x1="2" y1="12" x2="22" y2="12" />
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
@@ -377,10 +456,19 @@ const Playground = () => {
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
@@ -406,8 +494,8 @@ const Playground = () => {
         </div>
       </div>
     </>
-  )
-}
+  );
+};
 
 const App = () => {
   const [themeMode, setThemeMode] = useState(() => loadSettings().theme);
@@ -421,7 +509,7 @@ const App = () => {
     // Also poll for changes from same tab
     const interval = setInterval(() => {
       const current = loadSettings().theme;
-      setThemeMode(prev => prev !== current ? current : prev);
+      setThemeMode((prev) => (prev !== current ? current : prev));
     }, 200);
     return () => {
       window.removeEventListener('storage', handleStorage);
@@ -441,5 +529,5 @@ const App = () => {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);

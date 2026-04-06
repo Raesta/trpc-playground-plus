@@ -27,8 +27,8 @@ function parseArguments(argsString: string): any {
     // If it's a literal object, try to evaluate it safely
     if (argsString.trim().startsWith('{') && argsString.trim().endsWith('}')) {
       const jsonString = argsString
-        .replace(/(\w+):/g, '"$1":')  // quote property names
-        .replace(/'/g, '"');          // replace single quotes with double quotes
+        .replace(/(\w+):/g, '"$1":') // quote property names
+        .replace(/'/g, '"'); // replace single quotes with double quotes
 
       try {
         return JSON.parse(jsonString);
@@ -43,12 +43,12 @@ function parseArguments(argsString: string): any {
       return argsString.slice(1, -1); // Remove quotes
     }
 
-    if (!isNaN(Number(argsString))) {
+    if (!Number.isNaN(Number(argsString))) {
       return Number(argsString);
     }
 
     return argsString;
-  } catch (error) {
+  } catch (_error) {
     return argsString; // Fallback to raw string
   }
 }
@@ -142,7 +142,7 @@ function parseObjectLiteral(str: string): any {
       result[key] = null;
     } else if (valueStr === 'undefined') {
       result[key] = undefined;
-    } else if (!isNaN(Number(valueStr))) {
+    } else if (!Number.isNaN(Number(valueStr))) {
       result[key] = Number(valueStr);
     } else if (valueStr.startsWith('{')) {
       // Nested object
@@ -167,7 +167,7 @@ function getLineAndColumn(text: string, position: number): { line: number; colum
   const lines = text.substring(0, position).split('\n');
   return {
     line: lines.length,
-    column: lines[lines.length - 1].length + 1
+    column: lines[lines.length - 1].length + 1,
   };
 }
 
@@ -176,8 +176,7 @@ export function parseCodeForTrpcCalls(code: string): ParseResult {
   const errors: Array<{ message: string; position: { start: number; end: number } }> = [];
   const trpcCallStartRegex = /trpc\.(\w+(?:\.\w+)*)\.(query|mutate)\s*\(/g;
 
-  let match;
-  while ((match = trpcCallStartRegex.exec(code)) !== null) {
+  for (let match = trpcCallStartRegex.exec(code); match !== null; match = trpcCallStartRegex.exec(code)) {
     const procedurePath = match[1];
     const callType = match[2];
     const start = match.index;
@@ -214,7 +213,7 @@ export function parseCodeForTrpcCalls(code: string): ParseResult {
         // Unbalanced parentheses
         errors.push({
           message: 'Unbalanced parentheses in tRPC call',
-          position: { start, end: i }
+          position: { start, end: i },
         });
         continue;
       }
@@ -235,14 +234,14 @@ export function parseCodeForTrpcCalls(code: string): ParseResult {
           start,
           end,
           line: position.line,
-          column: position.column
+          column: position.column,
         },
-        rawCall: fullMatch
+        rawCall: fullMatch,
       });
     } catch (error) {
       errors.push({
         message: `Failed to parse tRPC call: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        position: { start, end: start + 100 }
+        position: { start, end: start + 100 },
       });
     }
   }

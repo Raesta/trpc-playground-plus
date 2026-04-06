@@ -1,4 +1,4 @@
-import { PlaygroundSettings } from './types';
+import type { PlaygroundSettings } from './types';
 import { getStorageKey } from './utils/storage-keys';
 
 const DEFAULTS: PlaygroundSettings = {
@@ -12,7 +12,9 @@ export function loadSettings(projectKey?: string): PlaygroundSettings {
   try {
     const raw = localStorage.getItem(getStorageKey('settings', projectKey));
     if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
-  } catch { /* corrupted data */ }
+  } catch {
+    /* corrupted data */
+  }
   return { ...DEFAULTS };
 }
 

@@ -1,4 +1,4 @@
-import { ThemeMode } from './types';
+import type { ThemeMode } from './types';
 
 const darkTheme = {
   colors: {
@@ -125,10 +125,29 @@ const lightTheme = {
 // Use a widened type so both themes are assignable
 export interface ThemeConfig {
   colors: {
-    bg: { root: string; primary: string; secondary: string; hover: string; active: string; overlay: string; code: string };
+    bg: {
+      root: string;
+      primary: string;
+      secondary: string;
+      hover: string;
+      active: string;
+      overlay: string;
+      code: string;
+    };
     border: { primary: string; secondary: string; focus: string };
     text: { primary: string; secondary: string; muted: string; link: string };
-    accent: { query: string; mutation: string; router: string; subscription: string; play: string; danger: string; info: string; primary: string; checkbox: string; spinner: string };
+    accent: {
+      query: string;
+      mutation: string;
+      router: string;
+      subscription: string;
+      play: string;
+      danger: string;
+      info: string;
+      primary: string;
+      checkbox: string;
+      spinner: string;
+    };
   };
   radius: { sm: string; md: string; lg: string };
   font: { sans: string; mono: string; size: { xs: string; sm: string; base: string; md: string } };

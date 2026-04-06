@@ -12,18 +12,20 @@ export interface RouterLike {
 }
 
 export interface RouterSchema {
-  [key: string]: {
-    type: 'router';
-    children?: RouterSchema;
-  } | {
-    type: 'query' | 'mutation';
-    inputs?: Record<string, string>;
-    outputs?: Record<string, string>;
-    inputSchema?: any;
-    outputSchema?: any;
-    inputZodSchema?: any;
-    outputZodSchema?: any;
-  }
+  [key: string]:
+    | {
+        type: 'router';
+        children?: RouterSchema;
+      }
+    | {
+        type: 'query' | 'mutation';
+        inputs?: Record<string, string>;
+        outputs?: Record<string, string>;
+        inputSchema?: any;
+        outputSchema?: any;
+        inputZodSchema?: any;
+        outputZodSchema?: any;
+      };
 }
 
 export interface PlaygroundConfig {
@@ -52,7 +54,7 @@ export const Scope = {
   GLOBAL: 'global',
   LOCAL: 'local',
 } as const;
-export type Scope = typeof Scope[keyof typeof Scope];
+export type Scope = (typeof Scope)[keyof typeof Scope];
 
 export type VariableType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null' | 'json';
 

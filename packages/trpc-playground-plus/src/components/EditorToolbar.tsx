@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo } from 'react';
-import { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { unfoldAll, foldable, foldEffect } from '@codemirror/language';
-import { EditorView } from '@codemirror/view';
+import { foldable, foldEffect, unfoldAll } from '@codemirror/language';
+import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import type React from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTheme } from '../ThemeContext';
 
 interface EditorToolbarProps {
@@ -19,37 +19,40 @@ const ToolbarButton: React.FC<{
 }> = ({ title, onClick, variant = 'icon', children }) => {
   const theme = useTheme();
 
-  const styles = useMemo(() => ({
-    btn: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'none',
-      border: '1px solid transparent',
-      borderRadius: theme.radius.sm,
-      color: theme.colors.text.secondary,
-      fontSize: '13px',
-      padding: '2px 6px',
-      cursor: 'pointer',
-      transition: `all ${theme.transition.fast}`,
-      lineHeight: 1,
-    } as React.CSSProperties,
-    pill: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.bg.primary,
-      border: `1px solid ${theme.colors.border.primary}`,
-      borderRadius: theme.radius.md,
-      color: theme.colors.text.primary,
-      fontSize: '13px',
-      padding: '4px 10px',
-      cursor: 'pointer',
-      transition: `background-color ${theme.transition.normal}`,
-      lineHeight: 1,
-      gap: '5px',
-    } as React.CSSProperties,
-  }), [theme]);
+  const styles = useMemo(
+    () => ({
+      btn: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'none',
+        border: '1px solid transparent',
+        borderRadius: theme.radius.sm,
+        color: theme.colors.text.secondary,
+        fontSize: '13px',
+        padding: '2px 6px',
+        cursor: 'pointer',
+        transition: `all ${theme.transition.fast}`,
+        lineHeight: 1,
+      } as React.CSSProperties,
+      pill: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.bg.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.md,
+        color: theme.colors.text.primary,
+        fontSize: '13px',
+        padding: '4px 10px',
+        cursor: 'pointer',
+        transition: `background-color ${theme.transition.normal}`,
+        lineHeight: 1,
+        gap: '5px',
+      } as React.CSSProperties,
+    }),
+    [theme],
+  );
 
   return (
     <button
@@ -78,18 +81,21 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
   const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
 
-  const styles = useMemo(() => ({
-    toolbar: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '4px',
-      padding: '4px 8px',
-      backgroundColor: theme.colors.bg.primary,
-      borderBottom: `1px solid ${theme.colors.border.primary}`,
-      flexShrink: 0,
-    } as React.CSSProperties,
-  }), [theme]);
+  const styles = useMemo(
+    () => ({
+      toolbar: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '4px',
+        padding: '4px 8px',
+        backgroundColor: theme.colors.bg.primary,
+        borderBottom: `1px solid ${theme.colors.border.primary}`,
+        flexShrink: 0,
+      } as React.CSSProperties,
+    }),
+    [theme],
+  );
 
   const handleFoldAll = useCallback(() => {
     const view = getView();
@@ -126,7 +132,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         {onTabDrawerClick && (
           <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick} variant="pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="4" y1="21" x2="4" y2="14" />
               <line x1="4" y1="10" x2="4" y2="3" />
               <line x1="12" y1="21" x2="12" y2="12" />
@@ -144,7 +159,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         {onFormat && (
           <ToolbarButton title="Format code (Shift+Alt+F)" onClick={onFormat} variant="pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M15 4V2" />
               <path d="M15 16v-2" />
               <path d="M8 9h2" />
@@ -158,13 +182,31 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
           </ToolbarButton>
         )}
         <ToolbarButton title="Fold all" onClick={handleFoldAll} variant="pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="4 14 12 6 20 14" />
             <polyline points="4 22 12 14 20 22" />
           </svg>
         </ToolbarButton>
         <ToolbarButton title="Unfold all" onClick={handleUnfoldAll} variant="pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="4 6 12 14 20 6" />
             <polyline points="4 14 12 22 20 14" />
           </svg>

@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import { useTheme } from '../../ThemeContext';
 
 interface CheckboxProps {
@@ -10,14 +10,7 @@ interface CheckboxProps {
   disabled?: boolean;
 }
 
-const Checkbox: React.FC<CheckboxProps> = ({
-  checked,
-  onChange,
-  id,
-  name,
-  className,
-  disabled
-}) => {
+const Checkbox: React.FC<CheckboxProps> = ({ checked, onChange, id, name, className, disabled }) => {
   const theme = useTheme();
 
   const styles: Record<string, React.CSSProperties> = {
@@ -43,7 +36,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
       border: `1px solid ${checked ? theme.colors.accent.checkbox : theme.colors.border.secondary}`,
       borderRadius: theme.radius.sm,
       cursor: disabled ? 'default' : 'pointer',
-      transition: `all ${theme.transition.normal}`
+      transition: `all ${theme.transition.normal}`,
     },
     checkmarkStyles: {
       position: 'absolute',
@@ -54,8 +47,8 @@ const Checkbox: React.FC<CheckboxProps> = ({
       border: 'solid white',
       borderWidth: '0 2px 2px 0',
       transform: 'rotate(45deg)',
-      display: checked ? 'block' : 'none'
-    }
+      display: checked ? 'block' : 'none',
+    },
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +60,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
   const handleClick = () => {
     if (!disabled) {
       const event = {
-        target: { checked: !checked }
+        target: { checked: !checked },
       } as React.ChangeEvent<HTMLInputElement>;
       onChange(event);
     }

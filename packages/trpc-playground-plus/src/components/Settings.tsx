@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useTheme } from "../ThemeContext";
-import { PlaygroundSettings } from "../types";
-import { saveSettings } from "../settings";
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { saveSettings } from '../settings';
+import { useTheme } from '../ThemeContext';
+import type { PlaygroundSettings } from '../types';
 
 interface SettingsProps {
   open: boolean;
@@ -49,36 +50,45 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
     onSettingsChange({ theme: newTheme } as any);
   };
 
-  const sectionTitleStyle: React.CSSProperties = useMemo(() => ({
-    color: theme.colors.text.muted,
-    fontSize: theme.font.size.xs,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    padding: '8px 0 6px',
-    borderBottom: `1px solid ${theme.colors.border.primary}`,
-    marginBottom: '10px',
-  }), [theme]);
+  const sectionTitleStyle: React.CSSProperties = useMemo(
+    () => ({
+      color: theme.colors.text.muted,
+      fontSize: theme.font.size.xs,
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      padding: '8px 0 6px',
+      borderBottom: `1px solid ${theme.colors.border.primary}`,
+      marginBottom: '10px',
+    }),
+    [theme],
+  );
 
   const settingRowStyle: React.CSSProperties = { marginBottom: '14px' };
-  const labelStyle: React.CSSProperties = useMemo(() => ({
-    display: 'block',
-    color: theme.colors.text.secondary,
-    fontSize: theme.font.size.xs,
-    marginBottom: '6px',
-  }), [theme]);
+  const labelStyle: React.CSSProperties = useMemo(
+    () => ({
+      display: 'block',
+      color: theme.colors.text.secondary,
+      fontSize: theme.font.size.xs,
+      marginBottom: '6px',
+    }),
+    [theme],
+  );
 
-  const selectStyle: React.CSSProperties = useMemo(() => ({
-    width: '100%',
-    backgroundColor: theme.colors.bg.hover,
-    color: theme.colors.text.primary,
-    border: `1px solid ${theme.colors.border.primary}`,
-    borderRadius: theme.radius.sm,
-    padding: '6px 8px',
-    fontSize: theme.font.size.sm,
-    cursor: 'pointer',
-    outline: 'none',
-  }), [theme]);
+  const selectStyle: React.CSSProperties = useMemo(
+    () => ({
+      width: '100%',
+      backgroundColor: theme.colors.bg.hover,
+      color: theme.colors.text.primary,
+      border: `1px solid ${theme.colors.border.primary}`,
+      borderRadius: theme.radius.sm,
+      padding: '6px 8px',
+      fontSize: theme.font.size.sm,
+      cursor: 'pointer',
+      outline: 'none',
+    }),
+    [theme],
+  );
 
   return (
     <>
@@ -113,7 +123,9 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
               animation: closing ? 'slideOut 0.25s forwards' : 'slideIn 0.3s forwards',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}
+            >
               <h3 style={{ color: theme.colors.text.primary, margin: 0 }}>Settings</h3>
               <button
                 onClick={handleClose}
@@ -127,8 +139,8 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                   lineHeight: 1,
                   transition: `color ${theme.transition.fast}`,
                 }}
-                onMouseOver={(e) => e.currentTarget.style.color = theme.colors.text.primary}
-                onMouseOut={(e) => e.currentTarget.style.color = theme.colors.text.secondary}
+                onMouseOver={(e) => (e.currentTarget.style.color = theme.colors.text.primary)}
+                onMouseOut={(e) => (e.currentTarget.style.color = theme.colors.text.secondary)}
               >
                 ×
               </button>
@@ -163,12 +175,14 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                   onChange={(e) => onSettingsChange({ fontSize: Number(e.target.value) })}
                   style={{ flex: 1, accentColor: theme.colors.accent.primary }}
                 />
-                <span style={{
-                  color: theme.colors.text.primary,
-                  fontSize: theme.font.size.xs,
-                  minWidth: '32px',
-                  textAlign: 'right',
-                }}>
+                <span
+                  style={{
+                    color: theme.colors.text.primary,
+                    fontSize: theme.font.size.xs,
+                    minWidth: '32px',
+                    textAlign: 'right',
+                  }}
+                >
                   {settings.fontSize}px
                 </span>
               </div>
@@ -184,8 +198,10 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                 onChange={(e) => onSettingsChange({ requestTimeout: Number(e.target.value) })}
                 style={selectStyle}
               >
-                {TIMEOUT_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                {TIMEOUT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
             </div>

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
-import { Header, PlaygroundSettings, Tab, Variable } from "../types";
+import { useMemo } from 'react';
 import { useTheme } from '../ThemeContext';
+import type { Header, PlaygroundSettings, Tab, Variable } from '../types';
 
 interface ExportButtonProps {
   tabs: Array<Tab>;
@@ -13,21 +13,24 @@ interface ExportButtonProps {
 export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables, projectKey }: ExportButtonProps) => {
   const theme = useTheme();
 
-  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
-    button: {
-      backgroundColor: theme.colors.bg.primary,
-      color: theme.colors.text.primary,
-      border: `1px solid ${theme.colors.border.primary}`,
-      padding: '6px 12px',
-      borderRadius: theme.radius.md,
-      cursor: 'pointer',
-      fontSize: theme.font.size.md,
-      transition: `background-color ${theme.transition.normal}`,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px'
-    }
-  }), [theme]);
+  const styles: Record<string, React.CSSProperties> = useMemo(
+    () => ({
+      button: {
+        backgroundColor: theme.colors.bg.primary,
+        color: theme.colors.text.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        padding: '6px 12px',
+        borderRadius: theme.radius.md,
+        cursor: 'pointer',
+        fontSize: theme.font.size.md,
+        transition: `background-color ${theme.transition.normal}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+      },
+    }),
+    [theme],
+  );
 
   const exportStructure = () => {
     const exportData = {
@@ -56,8 +59,8 @@ export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables, p
     <button
       onClick={exportStructure}
       style={styles.button}
-      onMouseOver={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.hover}
-      onMouseOut={(e) => e.currentTarget.style.backgroundColor = theme.colors.bg.primary}
+      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
     >
       <svg
         width="16"
@@ -75,5 +78,5 @@ export const ExportButton = ({ tabs, globalHeaders, settings, globalVariables, p
       </svg>
       Export
     </button>
-  )
-}
+  );
+};

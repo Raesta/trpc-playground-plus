@@ -1,20 +1,23 @@
-import React, { useRef, useMemo, useCallback } from 'react';
-import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { getCodeMirrorTheme } from '../editorTheme';
-import { autocompletion, CompletionContext, CompletionResult, startCompletion } from '@codemirror/autocomplete';
-import { RouterSchema, Variable, Scope } from '../types';
-import { Decoration, EditorView, WidgetType, GutterMarker, gutter, ViewUpdate } from '@codemirror/view';
-import { RangeSet, RangeSetBuilder } from '@codemirror/state';
+import {
+  autocompletion,
+  type CompletionContext,
+  type CompletionResult,
+  startCompletion,
+} from '@codemirror/autocomplete';
+import { javascript } from '@codemirror/lang-javascript';
 import { foldGutter } from '@codemirror/language';
-import { javascript } from "@codemirror/lang-javascript";
-import { linter, Diagnostic } from '@codemirror/lint';
-import { parseCodeForTrpcCalls } from '../utils/code-parser';
-import { validateCodeWithCache, resolveVariableType } from '../utils/zod-validator';
-import { createEditorTheme } from '../editorTheme';
-import { EditorToolbar } from './EditorToolbar';
+import { type Diagnostic, linter } from '@codemirror/lint';
+import { EditorView, GutterMarker, gutter, type ViewUpdate } from '@codemirror/view';
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
 import { useTheme } from '../ThemeContext';
-import { formatKeymap, formatDocument } from '../utils/formatter';
-import { ThemeConfig } from '../theme';
+import type { ThemeConfig } from '../theme';
+import { type RouterSchema, Scope, type Variable } from '../types';
+import { parseCodeForTrpcCalls } from '../utils/code-parser';
+import { formatDocument, formatKeymap } from '../utils/formatter';
+import { resolveVariableType, validateCodeWithCache } from '../utils/zod-validator';
+import { EditorToolbar } from './EditorToolbar';
 
 interface CodeEditorProps {
   value: string;
@@ -94,8 +97,12 @@ function createProcedureInfoNode(
     const label = document.createElement('div');
     label.textContent = labelText;
     Object.assign(label.style, {
-      fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
-      textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
+      fontSize: theme.font.size.xs,
+      fontWeight: '600',
+      color: theme.colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      marginTop: '8px',
     });
     container.appendChild(label);
     container.appendChild(createCodeBlock(content, theme));
@@ -127,10 +134,20 @@ function createPropertyInfoNode(
 
   const typeEl = document.createElement('span');
   typeEl.textContent = type;
-  Object.assign(typeEl.style, { fontSize: theme.font.size.sm, color: theme.colors.accent.info, fontFamily: theme.font.mono });
+  Object.assign(typeEl.style, {
+    fontSize: theme.font.size.sm,
+    color: theme.colors.accent.info,
+    fontFamily: theme.font.mono,
+  });
   header.appendChild(typeEl);
 
-  header.appendChild(createBadge(isRequired ? 'required' : 'optional', isRequired ? theme.colors.accent.danger : theme.colors.text.muted, theme));
+  header.appendChild(
+    createBadge(
+      isRequired ? 'required' : 'optional',
+      isRequired ? theme.colors.accent.danger : theme.colors.text.muted,
+      theme,
+    ),
+  );
   container.appendChild(header);
 
   if (description) {
@@ -164,8 +181,11 @@ function createTrpcInfoNode(theme: ThemeConfig): HTMLElement {
   const label = document.createElement('div');
   label.textContent = 'Usage';
   Object.assign(label.style, {
-    fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
-    textTransform: 'uppercase', letterSpacing: '0.5px',
+    fontSize: theme.font.size.xs,
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   });
   container.appendChild(label);
   container.appendChild(createCodeBlock('trpc.router.procedure.query(input)', theme));
@@ -201,8 +221,12 @@ function createVariableInfoNode(
     const label = document.createElement('div');
     label.textContent = 'Value';
     Object.assign(label.style, {
-      fontSize: theme.font.size.xs, fontWeight: '600', color: theme.colors.text.secondary,
-      textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '8px',
+      fontSize: theme.font.size.xs,
+      fontWeight: '600',
+      color: theme.colors.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      marginTop: '8px',
     });
     container.appendChild(label);
     container.appendChild(createCodeBlock(value, theme));
@@ -213,103 +237,118 @@ function createVariableInfoNode(
 
 // --- Component ---
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema, onPlayRequest, variables = [], onTabDrawerClick, fontSize = 15 }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({
+  value,
+  onChange,
+  schema,
+  onPlayRequest,
+  variables = [],
+  onTabDrawerClick,
+  fontSize = 15,
+}) => {
   const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
-  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
-    container: {
-      display: 'flex',
-      flexDirection: 'column',
-      border: `1px solid ${theme.colors.border.primary}`,
-      borderRadius: theme.radius.md,
-      overflow: 'hidden',
-      height: '100%',
-      width: '100%'
-    },
-    editor: {
-      height: '100%',
-      width: '100%',
-      overflow: 'hidden',
-      minHeight: 0,
-      flex: 1,
-    }
-  }), [theme]);
+  const styles: Record<string, React.CSSProperties> = useMemo(
+    () => ({
+      container: {
+        display: 'flex',
+        flexDirection: 'column',
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.md,
+        overflow: 'hidden',
+        height: '100%',
+        width: '100%',
+      },
+      editor: {
+        height: '100%',
+        width: '100%',
+        overflow: 'hidden',
+        minHeight: 0,
+        flex: 1,
+      },
+    }),
+    [theme],
+  );
 
-  const autocompleteTheme = useMemo(() => EditorView.theme({
-    '.cm-tooltip.cm-tooltip-autocomplete': {
-      border: `1px solid ${theme.colors.border.primary} !important`,
-      borderRadius: `${theme.radius.md} !important`,
-      backgroundColor: `${theme.colors.bg.secondary} !important`,
-      boxShadow: `${theme.shadow.lg} !important`,
-    },
-    '.cm-tooltip-autocomplete ul': {
-      fontFamily: `${theme.font.mono} !important`,
-      fontSize: `${theme.font.size.base} !important`,
-    },
-    '.cm-tooltip-autocomplete ul li': {
-      padding: '4px 2px 4px 4px !important',
-      borderBottom: '1px solid #ffffff08',
-    },
-    '.cm-tooltip-autocomplete ul li[aria-selected]': {
-      backgroundColor: `${theme.colors.bg.active} !important`,
-      color: `${theme.colors.text.primary} !important`,
-    },
-    '.cm-completionIcon': {
-      width: '18px !important',
-      height: '16px !important',
-      display: 'inline-block !important',
-      verticalAlign: 'middle',
-      backgroundSize: '14px 14px',
-      backgroundRepeat: 'no-repeat',
-      backgroundPosition: 'center center',
-      padding: '0 !important',
-      margin: '0 4px 0 0 !important',
-      marginLeft: '0 !important',
-      paddingLeft: '0 !important',
-    },
-    '.cm-completionIcon::after': { content: '"" !important' },
-    '.cm-completionIcon-class': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.router}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 21V9a9 9 0 0 0 9 9'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-function': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='12' cy='12' r='6'/><line x1='12' y1='6' x2='12' y2='18'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-method': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='9' cy='12' r='5'/><circle cx='15' cy='12' r='5'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-property': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.danger}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='4 7 4 4 20 4 20 7'/><line x1='9' y1='20' x2='15' y2='20'/><line x1='12' y1='4' x2='12' y2='20'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-variable-global': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-variable-local': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
-    },
-    '.cm-completionIcon-text': {
-      backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 7h10'/><path d='M12 7v10'/><path d='M9 17h6'/></svg>`)}")`,
-    },
-    '.cm-tooltip.cm-completionInfo': {
-      backgroundColor: `${theme.colors.bg.secondary} !important`,
-      border: `1px solid ${theme.colors.border.primary} !important`,
-      borderRadius: `${theme.radius.md} !important`,
-      boxShadow: `${theme.shadow.lg} !important`,
-      padding: '0 !important',
-      marginLeft: '4px !important',
-    },
-    '.cm-completionInfo.cm-completionInfo-left': {
-      marginRight: '4px !important',
-    },
-  }), [theme]);
+  const autocompleteTheme = useMemo(
+    () =>
+      EditorView.theme({
+        '.cm-tooltip.cm-tooltip-autocomplete': {
+          border: `1px solid ${theme.colors.border.primary} !important`,
+          borderRadius: `${theme.radius.md} !important`,
+          backgroundColor: `${theme.colors.bg.secondary} !important`,
+          boxShadow: `${theme.shadow.lg} !important`,
+        },
+        '.cm-tooltip-autocomplete ul': {
+          fontFamily: `${theme.font.mono} !important`,
+          fontSize: `${theme.font.size.base} !important`,
+        },
+        '.cm-tooltip-autocomplete ul li': {
+          padding: '4px 2px 4px 4px !important',
+          borderBottom: '1px solid #ffffff08',
+        },
+        '.cm-tooltip-autocomplete ul li[aria-selected]': {
+          backgroundColor: `${theme.colors.bg.active} !important`,
+          color: `${theme.colors.text.primary} !important`,
+        },
+        '.cm-completionIcon': {
+          width: '18px !important',
+          height: '16px !important',
+          display: 'inline-block !important',
+          verticalAlign: 'middle',
+          backgroundSize: '14px 14px',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center center',
+          padding: '0 !important',
+          margin: '0 4px 0 0 !important',
+          marginLeft: '0 !important',
+          paddingLeft: '0 !important',
+        },
+        '.cm-completionIcon::after': { content: '"" !important' },
+        '.cm-completionIcon-class': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.router}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='18' r='3'/><circle cx='6' cy='6' r='3'/><path d='M6 21V9a9 9 0 0 0 9 9'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-function': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='12' cy='12' r='6'/><line x1='12' y1='6' x2='12' y2='18'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-method': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 12'/><polyline points='6 12 2 12'/><circle cx='9' cy='12' r='5'/><circle cx='15' cy='12' r='5'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-property': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.danger}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='4 7 4 4 20 4 20 7'/><line x1='9' y1='20' x2='15' y2='20'/><line x1='12' y1='4' x2='12' y2='20'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-variable-global': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.query}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-variable-local': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
+        },
+        '.cm-completionIcon-text': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 7h10'/><path d='M12 7v10'/><path d='M9 17h6'/></svg>`)}")`,
+        },
+        '.cm-tooltip.cm-completionInfo': {
+          backgroundColor: `${theme.colors.bg.secondary} !important`,
+          border: `1px solid ${theme.colors.border.primary} !important`,
+          borderRadius: `${theme.radius.md} !important`,
+          boxShadow: `${theme.shadow.lg} !important`,
+          padding: '0 !important',
+          marginLeft: '4px !important',
+        },
+        '.cm-completionInfo.cm-completionInfo-left': {
+          marginRight: '4px !important',
+        },
+      }),
+    [theme],
+  );
 
   const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
     const variableTypes = new Map(
       variables
-        .filter(value => value.enabled && value.key.trim())
-        .map(value => [value.key.trim(), resolveVariableType(value.value)] as const)
+        .filter((value) => value.enabled && value.key.trim())
+        .map((value) => [value.key.trim(), resolveVariableType(value.value)] as const),
     );
 
     return linter((view) => {
@@ -354,7 +393,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     });
   }, []);
 
-  const trpcLinterExtension = React.useMemo(() => createTrpcLinter(schema, variables), [schema, variables, createTrpcLinter]);
+  const trpcLinterExtension = React.useMemo(
+    () => createTrpcLinter(schema, variables),
+    [schema, variables, createTrpcLinter],
+  );
 
   const formatSchemaForInfo = (schema: any): string => {
     if (!schema) return '';
@@ -380,10 +422,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   const getCompletionsFromPath = (path: string[]): CompletionResult['options'] => {
     if (path.length === 0 || path[0] === '') {
       return Object.entries(schema).map(([key, def]) => {
-        const inputType = def.type !== 'router' && 'inputSchema' in def && def.inputSchema
-          ? formatSchemaForInfo(def.inputSchema) : undefined;
-        const outputType = def.type !== 'router' && 'outputSchema' in def && def.outputSchema
-          ? formatSchemaForInfo(def.outputSchema) : undefined;
+        const inputType =
+          def.type !== 'router' && 'inputSchema' in def && def.inputSchema
+            ? formatSchemaForInfo(def.inputSchema)
+            : undefined;
+        const outputType =
+          def.type !== 'router' && 'outputSchema' in def && def.outputSchema
+            ? formatSchemaForInfo(def.outputSchema)
+            : undefined;
 
         let apply: string | ((view: any, completion: any, from: number, to: number) => void);
 
@@ -393,7 +439,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             const text = `${key}.${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 }
+              selection: { anchor: from + text.length - 1 },
             });
           };
         } else {
@@ -425,10 +471,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
 
     if (routerDef && routerDef.type === 'router' && routerDef.children) {
       return Object.entries(routerDef.children).map(([key, def]) => {
-        const inputType = def.type !== 'router' && 'inputSchema' in def && def.inputSchema
-          ? formatSchemaForInfo(def.inputSchema) : undefined;
-        const outputType = def.type !== 'router' && 'outputSchema' in def && def.outputSchema
-          ? formatSchemaForInfo(def.outputSchema) : undefined;
+        const inputType =
+          def.type !== 'router' && 'inputSchema' in def && def.inputSchema
+            ? formatSchemaForInfo(def.inputSchema)
+            : undefined;
+        const outputType =
+          def.type !== 'router' && 'outputSchema' in def && def.outputSchema
+            ? formatSchemaForInfo(def.outputSchema)
+            : undefined;
 
         let apply: string | ((view: any, completion: any, from: number, to: number) => void);
         if (['query', 'mutation'].includes(def.type)) {
@@ -437,7 +487,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             const text = `${key}.${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 }
+              selection: { anchor: from + text.length - 1 },
             });
           };
         } else {
@@ -454,10 +504,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       });
     } else if (routerDef) {
       const methodName = routerDef.type === 'mutation' ? 'mutate' : 'query';
-      const inputType = routerDef.type !== 'router' && 'inputSchema' in routerDef && routerDef.inputSchema
-        ? formatSchemaForInfo(routerDef.inputSchema) : undefined;
-      const outputType = routerDef.type !== 'router' && 'outputSchema' in routerDef && routerDef.outputSchema
-        ? formatSchemaForInfo(routerDef.outputSchema) : undefined;
+      const inputType =
+        routerDef.type !== 'router' && 'inputSchema' in routerDef && routerDef.inputSchema
+          ? formatSchemaForInfo(routerDef.inputSchema)
+          : undefined;
+      const outputType =
+        routerDef.type !== 'router' && 'outputSchema' in routerDef && routerDef.outputSchema
+          ? formatSchemaForInfo(routerDef.outputSchema)
+          : undefined;
 
       return [
         {
@@ -468,11 +522,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
             const text = `${methodName}()`;
             view.dispatch({
               changes: { from, to, insert: text },
-              selection: { anchor: from + text.length - 1 }
+              selection: { anchor: from + text.length - 1 },
             });
           },
           info: () => createProcedureInfoNode(methodName, routerDef.type, theme, inputType, outputType),
-        }
+        },
       ];
     }
 
@@ -484,10 +538,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     const text = context.state.doc.sliceString(0, context.pos);
 
     const regex = /trpc((?:\.\w+)+)\.(query|mutate)\(/g;
-    let procedureMatch;
     let lastMatch = null;
 
-    while ((procedureMatch = regex.exec(text)) !== null) {
+    for (let procedureMatch = regex.exec(text); procedureMatch !== null; procedureMatch = regex.exec(text)) {
       lastMatch = procedureMatch;
     }
 
@@ -538,15 +591,27 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         const lastSegment = path[path.length - 1];
         const procedureDef = currentLevel[lastSegment];
 
-        if (procedureDef && procedureDef.type !== 'router' && 'inputSchema' in procedureDef && procedureDef.inputSchema) {
+        if (
+          procedureDef &&
+          procedureDef.type !== 'router' &&
+          'inputSchema' in procedureDef &&
+          procedureDef.inputSchema
+        ) {
           const inputSchema = procedureDef.inputSchema;
 
           const argVariableOptions = variables
-            .filter(value => value.key.trim() && value.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value.key.trim()))
-            .map(value => ({
+            .filter((value) => value.key.trim() && value.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value.key.trim()))
+            .map((value) => ({
               label: value.key.trim(),
               type: value.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
-              info: () => createVariableInfoNode(value.key.trim(), value.type || resolveVariableType(value.value), value.value || '(empty)', theme, value.scope),
+              info: () =>
+                createVariableInfoNode(
+                  value.key.trim(),
+                  value.type || resolveVariableType(value.value),
+                  value.value || '(empty)',
+                  theme,
+                  value.scope,
+                ),
               boost: value.scope === Scope.GLOBAL ? -10 : -20,
             }));
 
@@ -569,13 +634,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                       const text = '{}';
                       view.dispatch({
                         changes: { from, to, insert: text },
-                        selection: { anchor: from + 1 }
+                        selection: { anchor: from + 1 },
                       });
                     },
-                    info: 'Add argument object'
+                    info: 'Add argument object',
                   },
                   ...argVariableOptions,
-                ]
+                ],
               };
             } else {
               const usedKeys = new Set<string>();
@@ -590,8 +655,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                 }
                 const objectContent = fullAfterProcedure.substring(braceStart + 1, scanPos - 1);
                 const propertyRegex = /(\w+)\s*:/g;
-                let propMatch;
-                while ((propMatch = propertyRegex.exec(objectContent)) !== null) {
+                for (
+                  let propMatch = propertyRegex.exec(objectContent);
+                  propMatch !== null;
+                  propMatch = propertyRegex.exec(objectContent)
+                ) {
                   usedKeys.add(propMatch[1]);
                 }
                 const tokens = objectContent.split(',');
@@ -626,7 +694,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
                   else apply = `${key}: `;
 
                   if (needsComma) {
-                    apply = ', ' + apply;
+                    apply = `, ${apply}`;
                   }
 
                   return {
@@ -661,23 +729,34 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
       const segments = pathStr ? pathStr.substring(1).split('.') : [];
 
       const path = endsWithDot
-        ? (segments.length > 0 ? segments : [''])
-        : (segments.length > 1 ? segments.slice(0, -1) : ['']);
+        ? segments.length > 0
+          ? segments
+          : ['']
+        : segments.length > 1
+          ? segments.slice(0, -1)
+          : [''];
 
       const options = getCompletionsFromPath(path);
 
       return {
         from: word.from,
-        options
+        options,
       };
     }
 
     const variableOptions = (variables ?? [])
-      .filter(v => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
-      .map(v => ({
+      .filter((v) => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
+      .map((v) => ({
         label: v.key.trim(),
         type: v.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
-        info: () => createVariableInfoNode(v.key.trim(), v.type || resolveVariableType(v.value), v.value || '(empty)', theme, v.scope),
+        info: () =>
+          createVariableInfoNode(
+            v.key.trim(),
+            v.type || resolveVariableType(v.value),
+            v.value || '(empty)',
+            theme,
+            v.scope,
+          ),
         boost: v.scope === Scope.GLOBAL ? -10 : -20,
       }));
 
@@ -687,7 +766,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         options: [
           { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode(theme) },
           ...variableOptions,
-        ]
+        ],
       };
     }
 
@@ -697,19 +776,23 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
         options: [
           { label: 'trpc', type: 'text', boost: 100, apply: 'trpc.', info: () => createTrpcInfoNode(theme) },
           ...variableOptions,
-        ]
+        ],
       };
     }
 
     return null;
   };
 
-  const trpcAutocompleteExtension = React.useMemo(() => autocompletion({
-    override: [createTRPCCompletions],
-    activateOnTyping: true,
-    defaultKeymap: true,
-    maxRenderedOptions: 100,
-  }), [schema, variables, theme]);
+  const trpcAutocompleteExtension = React.useMemo(
+    () =>
+      autocompletion({
+        override: [createTRPCCompletions],
+        activateOnTyping: true,
+        defaultKeymap: true,
+        maxRenderedOptions: 100,
+      }),
+    [schema, variables, theme],
+  );
 
   const dotTriggerExtension = EditorView.updateListener.of((update) => {
     if (!update.docChanged) return;
@@ -725,13 +808,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
     }
   });
 
-  const findTrpcCalls = (text: string): { start: number, end: number, code: string }[] => {
-    const calls: { start: number, end: number, code: string }[] = [];
+  const findTrpcCalls = (text: string): { start: number; end: number; code: string }[] => {
+    const calls: { start: number; end: number; code: string }[] = [];
     const regex = /trpc\.\w+(?:\.\w+)*\.(query|mutate)\(/g;
-    let match;
-
-    while ((match = regex.exec(text)) !== null) {
-      let start = match.index;
+    for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
+      const start = match.index;
       let pos = start + match[0].length;
       let openParens = 1;
 
@@ -749,7 +830,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
           calls.push({
             start,
             end: pos,
-            code: text.substring(start, pos)
+            code: text.substring(start, pos),
           });
         }
       }
@@ -776,26 +857,30 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   }
 
   class LineNumberMarker extends GutterMarker {
-    constructor(private num: string) { super(); }
+    constructor(private num: string) {
+      super();
+    }
     toDOM() {
-      const span = document.createElement("span");
+      const span = document.createElement('span');
       span.textContent = this.num;
       return span;
     }
   }
 
   class PlayButtonMarker extends GutterMarker {
-    constructor(private callCode: string) { super(); }
+    constructor(private callCode: string) {
+      super();
+    }
     toDOM() {
-      const btn = document.createElement("button");
-      btn.innerHTML = "▶";
+      const btn = document.createElement('button');
+      btn.innerHTML = '▶';
       btn.style.cssText = `
         font-size:9px; border:none; background:${theme.colors.accent.play};
         color:white; border-radius:50%; width:16px; height:16px;
         cursor:pointer; padding:0; display:inline-flex; align-items:center;
         justify-content:center; line-height:1;
       `;
-      btn.title = "Execute this call";
+      btn.title = 'Execute this call';
       const code = this.callCode;
       btn.onclick = (e) => {
         e.preventDefault();
@@ -807,7 +892,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, schema,
   }
 
   const playLineNumbersExtension = gutter({
-    class: "cm-lineNumbers",
+    class: 'cm-lineNumbers',
     lineMarker(view, line) {
       const text = view.state.doc.toString();
       const callLines = getCallLines(text, view.state.doc);

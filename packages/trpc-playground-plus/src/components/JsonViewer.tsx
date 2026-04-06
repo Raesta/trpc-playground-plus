@@ -1,9 +1,9 @@
-import React, { useRef, useMemo } from 'react';
-import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { getCodeMirrorTheme } from '../editorTheme';
-import { json } from "@codemirror/lang-json"
+import { json } from '@codemirror/lang-json';
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import type React from 'react';
+import { useMemo, useRef } from 'react';
+import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
 import { useTheme } from '../ThemeContext';
-import { createEditorTheme } from '../editorTheme';
 import { EditorToolbar } from './EditorToolbar';
 
 interface JsonViewerProps {
@@ -44,35 +44,38 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
-  const styles: Record<string, React.CSSProperties> = useMemo(() => ({
-    container: {
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'relative',
-      border: `1px solid ${theme.colors.border.primary}`,
-      borderRadius: theme.radius.md,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.bg.primary,
-      height: '100%',
-      width: '100%'
-    },
-    editor: {
-      height: '100%',
-      width: '100%',
-      overflow: 'hidden',
-      minHeight: 0,
-      flex: 1,
-    },
-    loadingOverlay: {
-      position: 'absolute',
-      inset: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.bg.overlay,
-      zIndex: 10,
-    },
-  }), [theme]);
+  const styles: Record<string, React.CSSProperties> = useMemo(
+    () => ({
+      container: {
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.md,
+        overflow: 'hidden',
+        backgroundColor: theme.colors.bg.primary,
+        height: '100%',
+        width: '100%',
+      },
+      editor: {
+        height: '100%',
+        width: '100%',
+        overflow: 'hidden',
+        minHeight: 0,
+        flex: 1,
+      },
+      loadingOverlay: {
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.bg.overlay,
+        zIndex: 10,
+      },
+    }),
+    [theme],
+  );
 
   return (
     <div style={styles.container}>
@@ -86,10 +89,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
         ref={editorRef}
         value={value}
         theme={cmTheme}
-        extensions={[
-          json(),
-          editorTheme,
-        ]}
+        extensions={[json(), editorTheme]}
         onChange={onChange}
         editable={false}
         style={styles.editor}
