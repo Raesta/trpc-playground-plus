@@ -17,7 +17,16 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['react', 'react-dom', '@trpc/client', '@trpc/server', 'node:path', 'node:fs', 'node:url', '@fastify/static'],
+      external: [
+        'react',
+        'react-dom',
+        '@trpc/client',
+        '@trpc/server',
+        'node:path',
+        'node:fs',
+        'node:url',
+        '@fastify/static',
+      ],
     },
     outDir: 'dist',
     emptyOutDir: true,
