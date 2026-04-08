@@ -194,7 +194,7 @@ const VarsHeadersDrawer = ({
               [isLeft ? 'left' : 'right']: 0,
               top: 0,
               height: '100%',
-              minWidth: '30vw',
+              width: '50%',
               backgroundColor: theme.colors.bg.primary,
               [isLeft ? 'borderRight' : 'borderLeft']: `1px solid ${theme.colors.border.primary}`,
               padding: '10px',
