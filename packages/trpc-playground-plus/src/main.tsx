@@ -1,12 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import ReactDOM from 'react-dom/client'
-import { createDynamicTRPCClient } from './utils/trpc/trpc-client'
-import TabCodeEditor from './components/TabCodeEditor'
-import { ExportButton } from './components/ExportButton'
-import { Tab } from './types'
-import Headers from './components/Headers'
-import { theme as t } from './theme'
-import { loadSettings, saveSettings } from './settings'
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ReactDOM from 'react-dom/client';
+import { ExportButton } from './components/ExportButton';
+import Settings from './components/Settings';
+import TabCodeEditor from './components/TabCodeEditor';
+import VarsHeadersDrawer from './components/VarsHeadersDrawer';
+import { loadSettings, saveSettings } from './settings';
+import { ThemeProvider, useTheme } from './ThemeContext';
+import { getTheme } from './theme';
+import { type Header, Scope, type Tab, type Variable, type VariableType } from './types';
+import { getStorageKey } from './utils/storage-keys';
+import { createDynamicTRPCClient } from './utils/trpc/trpc-client';
+import { validateVariableValue } from './utils/variable-validation';
 
 interface RouterSchema {
   [key: string]: {
@@ -20,86 +24,213 @@ interface PlaygroundConfig {
   transformer?: 'superjson';
   endpoints: string[];
   schema: RouterSchema;
+  projectKey?: string;
+}
+
+function coerceVariableValue(raw: string, type: VariableType): any {
+  switch (type) {
+    case 'string':
+      return raw;
+    case 'number': {
+      const n = Number(raw);
+      return Number.isNaN(n) ? 0 : n;
+    }
+    case 'boolean':
+      return raw === 'true' || raw === '1';
+    case 'null':
+      return null;
+    case 'object':
+    case 'array':
+    case 'json':
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return type === 'array' ? [] : {};
+      }
+  }
+}
+
+function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], locals: T[]): (T & { scope: Scope })[] {
+  const enabledLocalKeys = new Set(
+    locals.filter((local) => local.key.trim() && local.enabled).map((local) => local.key.trim()),
+  );
+  return [
+    ...globals
+      .filter((global) => global.key.trim() && !enabledLocalKeys.has(global.key.trim()))
+      .map((global) => ({ ...global, scope: Scope.GLOBAL })),
+    ...locals.map((local) => ({ ...local, scope: Scope.LOCAL })),
+  ];
+}
+
+function ensureVariableType(value: any): Variable {
+  return { ...value, type: value.type || 'string' };
+}
+
+function ensureTabFields(tab: any): Tab {
+  return {
+    ...tab,
+    variables: Array.isArray(tab.variables) ? tab.variables.map(ensureVariableType) : [],
+    headers: Array.isArray(tab.headers) ? tab.headers : [],
+  };
 }
 
 const Playground = () => {
+  const theme = useTheme();
   const [config, setConfig] = useState<PlaygroundConfig | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [headersOpen, setHeadersOpen] = useState(false);
-  const [headers, setHeaders] = useState<Array<{key: string, value: string, enabled: boolean}>>([{key: '', value: '', enabled: true}]);
+  const [globalDrawerOpen, setGlobalDrawerOpen] = useState(false);
+  const [globalHeaders, setGlobalHeaders] = useState<Header[]>([{ key: '', value: '', enabled: true }]);
+  const [globalVariables, setGlobalVariables] = useState<Variable[]>([
+    { key: '', value: '', type: 'string', enabled: true },
+  ]);
+  const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
+  const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
+  const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const handleSplitChange = useCallback((pct: number) => {
-    setSplitPosition(pct);
-    saveSettings({ splitPosition: pct });
-  }, []);
+  const handleSplitChange = useCallback(
+    (pct: number) => {
+      setSplitPosition(pct);
+      saveSettings({ splitPosition: pct }, config?.projectKey);
+    },
+    [config?.projectKey],
+  );
 
-  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
-    localStorage.setItem('trpc-playground-tabs', JSON.stringify(updatedTabs));
-    localStorage.setItem('trpc-playground-headers', JSON.stringify(updatedHeaders));
+  const handleSettingsChange = useCallback(
+    (partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
+      if (partial.fontSize !== undefined) {
+        setFontSize(partial.fontSize);
+      }
+      if (partial.requestTimeout !== undefined) {
+        setRequestTimeout(partial.requestTimeout);
+      }
+      saveSettings(partial, config?.projectKey);
+    },
+    [config?.projectKey],
+  );
+
+  const saveDataToLocalStorage = (updatedTabs: Tab[], updatedHeaders: Header[], updatedVariables: Variable[]) => {
+    localStorage.setItem(getStorageKey('tabs', config?.projectKey), JSON.stringify(updatedTabs));
+    localStorage.setItem(getStorageKey('headers', config?.projectKey), JSON.stringify(updatedHeaders));
+    localStorage.setItem(getStorageKey('variables', config?.projectKey), JSON.stringify(updatedVariables));
   };
 
   const handleUpdateTabs = (newTabs: Tab[]) => {
     setTabs(newTabs);
-    saveDataToLocalStorage(newTabs, headers);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
-  const handleUpdateHeaders = (newHeaders: Array<{key: string, value: string, enabled: boolean}>) => {
-    setHeaders(newHeaders);
-    saveDataToLocalStorage(tabs, newHeaders);
+  const handleUpdateGlobalHeaders = (newHeaders: Header[]) => {
+    setGlobalHeaders(newHeaders);
+    saveDataToLocalStorage(tabs, newHeaders, globalVariables);
+  };
+
+  const handleUpdateGlobalVariables = (newVariables: Variable[]) => {
+    setGlobalVariables(newVariables);
+    saveDataToLocalStorage(tabs, globalHeaders, newVariables);
+  };
+
+  const handleUpdateActiveTabVariables = (newVariables: Variable[]) => {
+    const newTabs = tabs.map((tab) => (tab.isActive ? { ...tab, variables: newVariables } : tab));
+    setTabs(newTabs);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
+  };
+
+  const handleUpdateActiveTabHeaders = (newHeaders: Header[]) => {
+    const newTabs = tabs.map((tab) => (tab.isActive ? { ...tab, headers: newHeaders } : tab));
+    setTabs(newTabs);
+    saveDataToLocalStorage(newTabs, globalHeaders, globalVariables);
   };
 
   useEffect(() => {
     fetch('/playground/config')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const { defaultTabs, defaultHeaders, ...rest } = data;
         setConfig(rest);
 
-        const savedTabs = localStorage.getItem('trpc-playground-tabs');
-        const savedHeaders = localStorage.getItem('trpc-playground-headers');
+        const savedTabs = localStorage.getItem(getStorageKey('tabs', rest.projectKey));
+        const savedHeaders = localStorage.getItem(getStorageKey('headers', rest.projectKey));
+        const savedVariables = localStorage.getItem(getStorageKey('variables', rest.projectKey));
 
         if (savedTabs) {
-          setTabs(JSON.parse(savedTabs));
+          const parsed = JSON.parse(savedTabs);
+          setTabs(parsed.map(ensureTabFields));
         } else {
-          setTabs(defaultTabs);
+          setTabs((defaultTabs || []).map(ensureTabFields));
         }
 
         if (savedHeaders) {
-          setHeaders(JSON.parse(savedHeaders));
+          setGlobalHeaders(JSON.parse(savedHeaders));
         } else {
-          setHeaders(defaultHeaders);
+          setGlobalHeaders(defaultHeaders);
+        }
+
+        if (savedVariables) {
+          setGlobalVariables(JSON.parse(savedVariables).map(ensureVariableType));
         }
       })
-      .catch(err => console.error('Error loading configuration:', err));
+      .catch((err) => console.error('Error loading configuration:', err));
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    const s = loadSettings(config.projectKey);
+    setSplitPosition(s.splitPosition);
+    setFontSize(s.fontSize);
+    setRequestTimeout(s.requestTimeout);
+  }, [config]);
 
   if (!config) {
     return <div>Loading playground...</div>;
   }
 
+  const activeTab = tabs.find((tab) => tab.isActive);
+  const mergedVariables = mergeByKey(globalVariables, activeTab?.variables ?? []);
+  const mergedHeaders = mergeByKey(globalHeaders, activeTab?.headers ?? []);
+
   const getHeadersObject = () => {
     const result: Record<string, string> = {};
-
-    headers.forEach(h => {
+    mergedHeaders.forEach((h) => {
       if (h.key.trim() && h.value.trim() && h.enabled) {
         result[h.key.trim()] = h.value.trim();
       }
     });
-
     return result;
   };
 
   const executeSpecificCode = async (specificCode: string) => {
-    setResult('')
+    setResult('');
     setIsLoading(true);
     const headersObject = getHeadersObject();
-    const trpcClient = createDynamicTRPCClient({ trpcUrl: config.trpcEndpoint, transformer: config.transformer, headers: headersObject });
+    const trpcClient = createDynamicTRPCClient({
+      trpcUrl: config.trpcEndpoint,
+      transformer: config.transformer,
+      headers: headersObject,
+    });
 
     try {
-      const executeFunction = new Function('trpc', `
+      const varNames: string[] = [];
+      const varValues: any[] = [];
+      mergedVariables.forEach((v) => {
+        if (
+          v.key.trim() &&
+          v.enabled &&
+          /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()) &&
+          !validateVariableValue(v.value, v.type || 'string')
+        ) {
+          varNames.push(v.key.trim());
+          varValues.push(coerceVariableValue(v.value, v.type || 'string'));
+        }
+      });
+
+      const executeFunction = new Function(
+        'trpc',
+        ...varNames,
+        `
         return (async () => {
           try {
             return await ${specificCode};
@@ -107,8 +238,23 @@ const Playground = () => {
             return { error };
           }
         })();
-      `);
-      const result = await executeFunction(trpcClient);
+      `,
+      );
+
+      const resultPromise = executeFunction(trpcClient, ...varValues);
+      const result =
+        requestTimeout > 0
+          ? await Promise.race([
+              resultPromise,
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(new Error(`Request timed out after ${requestTimeout / 1000}s`)),
+                  requestTimeout,
+                ),
+              ),
+            ])
+          : await resultPromise;
+
       setResult(JSON.stringify(result, null, 2));
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
@@ -134,31 +280,56 @@ const Playground = () => {
           const content = e.target?.result as string;
           const importedData = JSON.parse(content);
 
-          if (!importedData.tabs || !Array.isArray(importedData.tabs) || !importedData.headers || !Array.isArray(importedData.headers)) {
+          const importedGlobalVariables = importedData.globalVariables || importedData.variables;
+          const importedGlobalHeaders = importedData.globalHeaders || importedData.headers;
+
+          if (!importedData.tabs || !Array.isArray(importedData.tabs)) {
             alert('Invalid file format');
             return;
           }
 
-          const importedTabs = importedData.tabs.map((tab: any, index: number) => ({
-            ...tab,
-            isActive: index === 0,
-          }));
+          if (importedData.projectKey && config?.projectKey && importedData.projectKey !== config.projectKey) {
+            const proceed = confirm(
+              `This export is from project "${importedData.projectKey}" but you are in "${config.projectKey}". Import anyway?`,
+            );
+            if (!proceed) return;
+          }
+
+          const projectkey = config?.projectKey;
+
+          const importedTabs = importedData.tabs.map((tab: any, index: number) =>
+            ensureTabFields({
+              ...tab,
+              isActive: index === 0,
+            }),
+          );
 
           if (importedTabs.length > 0) {
             setTabs(importedTabs);
-            localStorage.setItem('trpc-playground-tabs', JSON.stringify(importedTabs));
+            localStorage.setItem(getStorageKey('tabs', projectkey), JSON.stringify(importedTabs));
           }
 
-          if (importedData.headers.length > 0) {
-            setHeaders(importedData.headers);
-            localStorage.setItem('trpc-playground-headers', JSON.stringify(importedData.headers));
-          }
+          const resolvedHeaders =
+            importedGlobalHeaders && Array.isArray(importedGlobalHeaders) ? importedGlobalHeaders : [];
+          setGlobalHeaders(resolvedHeaders);
+          localStorage.setItem(getStorageKey('headers', projectkey), JSON.stringify(resolvedHeaders));
+
+          const resolvedVars =
+            importedGlobalVariables && Array.isArray(importedGlobalVariables)
+              ? importedGlobalVariables.map(ensureVariableType)
+              : [];
+          setGlobalVariables(resolvedVars);
+          localStorage.setItem(getStorageKey('variables', projectkey), JSON.stringify(resolvedVars));
 
           if (importedData.settings && typeof importedData.settings === 'object') {
-            saveSettings(importedData.settings);
-            const merged = loadSettings();
-            setSplitPosition(merged.splitPosition);
+            saveSettings(importedData.settings, projectkey);
+          } else {
+            localStorage.removeItem(getStorageKey('settings', projectkey));
           }
+          const merged = loadSettings(projectkey);
+          setSplitPosition(merged.splitPosition);
+          setFontSize(merged.fontSize);
+          setRequestTimeout(merged.requestTimeout);
         } catch (error) {
           alert(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -171,14 +342,14 @@ const Playground = () => {
   };
 
   const btnStyle: React.CSSProperties = {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
+    backgroundColor: theme.colors.bg.primary,
+    color: theme.colors.text.primary,
+    border: `1px solid ${theme.colors.border.primary}`,
     padding: '6px 12px',
-    borderRadius: t.radius.md,
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
-    fontSize: t.font.size.md,
-    transition: `background-color ${t.transition.normal}`,
+    fontSize: theme.font.size.md,
+    transition: `background-color ${theme.transition.normal}`,
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
@@ -186,21 +357,74 @@ const Playground = () => {
 
   return (
     <>
-      <Headers headers={headers} setHeaders={handleUpdateHeaders} open={headersOpen} setOpen={setHeadersOpen} />
-      <div style={{ padding: 10, fontFamily: t.font.sans }}>
+      <VarsHeadersDrawer
+        title="Global"
+        open={globalDrawerOpen}
+        setOpen={setGlobalDrawerOpen}
+        variables={globalVariables}
+        setVariables={handleUpdateGlobalVariables}
+        headers={globalHeaders}
+        setHeaders={handleUpdateGlobalHeaders}
+        side="right"
+      />
+      {activeTab && (
+        <VarsHeadersDrawer
+          title={`Tab: ${activeTab.title}`}
+          open={tabDrawerOpen}
+          setOpen={setTabDrawerOpen}
+          variables={activeTab.variables}
+          setVariables={handleUpdateActiveTabVariables}
+          headers={activeTab.headers}
+          setHeaders={handleUpdateActiveTabHeaders}
+          side="left"
+        />
+      )}
+      <Settings
+        open={settingsOpen}
+        setOpen={setSettingsOpen}
+        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout }}
+        onSettingsChange={handleSettingsChange}
+      />
+      <div style={{ padding: 10, fontFamily: theme.font.sans }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ color: t.colors.text.secondary, fontSize: t.font.size.md }}>
-            Connected to : <code>{config.trpcEndpoint}</code>
+          <p style={{ color: theme.colors.text.secondary, fontSize: theme.font.size.md }}>
+            Connected to :{' '}
+            <code
+              style={{
+                color: theme.colors.text.primary,
+                backgroundColor: theme.colors.bg.code,
+                padding: '2px 6px',
+                borderRadius: theme.radius.sm,
+                fontFamily: theme.font.mono,
+              }}
+            >
+              {config.trpcEndpoint}
+            </code>
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <ExportButton tabs={tabs} headers={headers} settings={loadSettings()} />
+            <ExportButton
+              tabs={tabs}
+              globalHeaders={globalHeaders}
+              settings={loadSettings(config?.projectKey)}
+              globalVariables={globalVariables}
+              projectKey={config?.projectKey}
+            />
             <button
               onClick={importStructure}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 10 12 15 7 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -208,12 +432,46 @@ const Playground = () => {
               Import
             </button>
             <button
-              onClick={() => setHeadersOpen(!headersOpen)}
+              onClick={() => setGlobalDrawerOpen(!globalDrawerOpen)}
               style={btnStyle}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
             >
-              Headers
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              Global
+            </button>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              style={btnStyle}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </button>
           </div>
         </div>
@@ -229,15 +487,47 @@ const Playground = () => {
             isLoading={isLoading}
             splitPosition={splitPosition}
             onSplitChange={handleSplitChange}
+            mergedVariables={mergedVariables}
+            onTabDrawerClick={() => setTabDrawerOpen(!tabDrawerOpen)}
+            fontSize={fontSize}
           />
         </div>
       </div>
     </>
-  )
-}
+  );
+};
+
+const App = () => {
+  const [themeMode, setThemeMode] = useState(() => loadSettings().theme);
+  const currentTheme = useMemo(() => getTheme(themeMode), [themeMode]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setThemeMode(loadSettings().theme);
+    };
+    window.addEventListener('storage', handleStorage);
+    // Also poll for changes from same tab
+    const interval = setInterval(() => {
+      const current = loadSettings().theme;
+      setThemeMode((prev) => (prev !== current ? current : prev));
+    }, 200);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <ThemeProvider value={currentTheme}>
+      <div style={{ backgroundColor: currentTheme.colors.bg.root, minHeight: '100vh' }}>
+        <Playground />
+      </div>
+    </ThemeProvider>
+  );
+};
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Playground />
-  </React.StrictMode>
-)
+    <App />
+  </React.StrictMode>,
+);

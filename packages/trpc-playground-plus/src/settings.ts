@@ -1,20 +1,24 @@
-import { PlaygroundSettings } from './types';
-
-const STORAGE_KEY = 'trpc-playground-settings';
+import type { PlaygroundSettings } from './types';
+import { getStorageKey } from './utils/storage-keys';
 
 const DEFAULTS: PlaygroundSettings = {
   splitPosition: 50,
+  fontSize: 15,
+  theme: 'dark',
+  requestTimeout: 0,
 };
 
-export function loadSettings(): PlaygroundSettings {
+export function loadSettings(projectKey?: string): PlaygroundSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey('settings', projectKey));
     if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
-  } catch { /* corrupted data */ }
+  } catch {
+    /* corrupted data */
+  }
   return { ...DEFAULTS };
 }
 
-export function saveSettings(partial: Partial<PlaygroundSettings>): void {
-  const current = loadSettings();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...partial }));
+export function saveSettings(partial: Partial<PlaygroundSettings>, projectKey?: string): void {
+  const current = loadSettings(projectKey);
+  localStorage.setItem(getStorageKey('settings', projectKey), JSON.stringify({ ...current, ...partial }));
 }

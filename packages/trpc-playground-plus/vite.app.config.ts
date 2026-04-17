@@ -1,7 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
-import fs from 'fs'
+import fs from 'node:fs';
+import { resolve } from 'node:path';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [
@@ -9,12 +9,9 @@ export default defineConfig({
     {
       name: 'copy-html',
       closeBundle() {
-        fs.copyFileSync(
-          resolve(__dirname, 'index.html'),
-          resolve(__dirname, 'dist/app/index.html')
-        )
-      }
-    }
+        fs.copyFileSync(resolve(__dirname, 'index.html'), resolve(__dirname, 'dist/app/index.html'));
+      },
+    },
   ],
   build: {
     outDir: 'dist/app',
@@ -23,8 +20,8 @@ export default defineConfig({
       input: resolve(__dirname, 'src/main.tsx'),
       output: {
         entryFileNames: 'app.js',
-        assetFileNames: '[name].[ext]'
-      }
-    }
-  }
-})
+        assetFileNames: '[name].[ext]',
+      },
+    },
+  },
+});

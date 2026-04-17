@@ -1,5 +1,5 @@
-import { RouterSchema } from '../types';
-import { TrpcCall } from './code-parser';
+import type { RouterSchema } from '../types';
+import type { TrpcCall } from './code-parser';
 
 export interface ValidationError {
   message: string;
@@ -21,7 +21,7 @@ export interface ValidationResult {
 
 function getProcedureSchema(
   procedure: string,
-  schema: RouterSchema
+  schema: RouterSchema,
 ): { inputSchema?: any; outputSchema?: any; type?: string } | null {
   const pathSegments = procedure.split('.');
   let currentLevel = schema;
@@ -49,12 +49,50 @@ function getProcedureSchema(
   return {
     inputSchema: procDef.inputSchema,
     outputSchema: procDef.outputSchema,
-    type: procDef.type
+    type: procDef.type,
   };
 }
 
-function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean; errors: any[] } {
+/** Resolve the JSON type of a variable value (same logic as Variables.tsx resolveType) */
+export function resolveVariableType(value: string): string {
+  if (!value.trim()) return 'unknown';
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed === null) return 'null';
+    if (Array.isArray(parsed)) return 'array';
+    return typeof parsed; // 'string' | 'number' | 'boolean' | 'object'
+  } catch {
+    return 'string'; // fallback: raw string
+  }
+}
+
+function validateWithJsonSchema(
+  data: any,
+  jsonSchema: any,
+  variableTypes: Map<string, string> = new Map(),
+): { success: boolean; errors: any[] } {
   if (!jsonSchema) {
+    return { success: true, errors: [] };
+  }
+
+  // Check if data is a known variable — validate its type against the schema
+  if (typeof data === 'string' && variableTypes.has(data)) {
+    const varType = variableTypes.get(data)!;
+    const expectedType = jsonSchema.type;
+    if (expectedType && varType !== 'unknown' && varType !== expectedType) {
+      return {
+        success: false,
+        errors: [
+          {
+            code: 'invalid_type',
+            message: `Variable "${data}" is ${varType}, but expected ${expectedType}`,
+            path: [],
+            expected: expectedType,
+            received: varType,
+          },
+        ],
+      };
+    }
     return { success: true, errors: [] };
   }
 
@@ -69,7 +107,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
         message: `Expected object, but received ${Array.isArray(data) ? 'array' : typeof data}`,
         path: [],
         expected: 'object',
-        received: Array.isArray(data) ? 'array' : typeof data
+        received: Array.isArray(data) ? 'array' : typeof data,
       });
       return { success: false, errors };
     }
@@ -86,7 +124,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
             path: [prop],
             keys: [prop],
             allowedKeys: allowedProps,
-            schemaProperties: jsonSchema.properties
+            schemaProperties: jsonSchema.properties,
           });
         }
       }
@@ -104,7 +142,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
               message: `Required property "${requiredProp}" is missing`,
               path: [requiredProp],
               expected: 'defined',
-              received: 'undefined'
+              received: 'undefined',
             });
           }
         }
@@ -123,21 +161,35 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
 
           if (isJsExpr) {
             const jsExpr = propValue.substring('__JS_EXPR__'.length);
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected ${propType}, but received JavaScript expression`,
-              path: [propName],
-              expected: propType,
-              received: 'expression',
-              jsExpression: jsExpr
-            });
+            if (variableTypes.has(jsExpr)) {
+              // Known variable — check type compatibility
+              const varType = variableTypes.get(jsExpr)!;
+              if (propType && varType !== 'unknown' && varType !== propType) {
+                errors.push({
+                  code: 'invalid_type',
+                  message: `Variable "${jsExpr}" is ${varType}, but expected ${propType}`,
+                  path: [propName],
+                  expected: propType,
+                  received: varType,
+                });
+              }
+            } else {
+              errors.push({
+                code: 'invalid_type',
+                message: `Expected ${propType}, but received JavaScript expression`,
+                path: [propName],
+                expected: propType,
+                received: 'expression',
+                jsExpression: jsExpr,
+              });
+            }
           } else if (propType === 'string' && typeof propValue !== 'string') {
             errors.push({
               code: 'invalid_type',
               message: `Expected string, but received ${typeof propValue}`,
               path: [propName],
               expected: 'string',
-              received: typeof propValue
+              received: typeof propValue,
             });
           } else if (propType === 'number' && typeof propValue !== 'number') {
             errors.push({
@@ -145,7 +197,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
               message: `Expected number, but received ${typeof propValue}`,
               path: [propName],
               expected: 'number',
-              received: typeof propValue
+              received: typeof propValue,
             });
           } else if (propType === 'boolean' && typeof propValue !== 'boolean') {
             errors.push({
@@ -153,15 +205,18 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
               message: `Expected boolean, but received ${typeof propValue}`,
               path: [propName],
               expected: 'boolean',
-              received: typeof propValue
+              received: typeof propValue,
             });
-          } else if (propType === 'object' && (typeof propValue !== 'object' || propValue === null || Array.isArray(propValue))) {
+          } else if (
+            propType === 'object' &&
+            (typeof propValue !== 'object' || propValue === null || Array.isArray(propValue))
+          ) {
             errors.push({
               code: 'invalid_type',
               message: `Expected object, but received ${Array.isArray(propValue) ? 'array' : typeof propValue}`,
               path: [propName],
               expected: 'object',
-              received: Array.isArray(propValue) ? 'array' : typeof propValue
+              received: Array.isArray(propValue) ? 'array' : typeof propValue,
             });
           }
         }
@@ -174,7 +229,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
         message: `Expected string, but received ${typeof data}`,
         path: [],
         expected: 'string',
-        received: typeof data
+        received: typeof data,
       });
     }
   } else if (jsonSchema.type === 'number') {
@@ -184,7 +239,7 @@ function validateWithJsonSchema(data: any, jsonSchema: any): { success: boolean;
         message: `Expected number, but received ${typeof data}`,
         path: [],
         expected: 'number',
-        received: typeof data
+        received: typeof data,
       });
     }
   }
@@ -228,18 +283,20 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
     if (zodError.allowedKeys && zodError.allowedKeys.length > 0) {
       message += '\n\n';
       message += 'Available properties:\n';
-      message += zodError.allowedKeys.map((key: string) => {
-        let typeName = 'unknown';
+      message += zodError.allowedKeys
+        .map((key: string) => {
+          let typeName = 'unknown';
 
-        if (zodError.schemaProperties && zodError.schemaProperties[key]) {
-          const propSchema = zodError.schemaProperties[key];
-          if (propSchema.type) {
-            typeName = propSchema.type;
+          if (zodError.schemaProperties?.[key]) {
+            const propSchema = zodError.schemaProperties[key];
+            if (propSchema.type) {
+              typeName = propSchema.type;
+            }
           }
-        }
 
-        return `  • ${key} (${typeName})`;
-      }).join('\n');
+          return `  • ${key} (${typeName})`;
+        })
+        .join('\n');
       message += '\n\n';
     }
   }
@@ -263,7 +320,7 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
           start: propertyStart,
           end: propertyEnd,
           line: call.position.line,
-          column: call.position.column + match.index
+          column: call.position.column + match.index,
         };
       }
     } else if (zodError.code === 'invalid_type') {
@@ -288,7 +345,7 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
           start: valueStart,
           end: valueEnd,
           line: call.position.line,
-          column: call.position.column + match.index + match[0].indexOf(match[1])
+          column: call.position.column + match.index + match[0].indexOf(match[1]),
         };
       }
     }
@@ -298,13 +355,14 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
     message,
     path,
     code: zodError.code || 'validation_error',
-    position
+    position,
   };
 }
 
 export function validateTrpcCall(
   call: TrpcCall,
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map(),
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
@@ -316,7 +374,7 @@ export function validateTrpcCall(
     errors.push({
       message: `Procedure "${call.procedure}" not found`,
       code: 'procedure_not_found',
-      position: call.position
+      position: call.position,
     });
     return { isValid: false, errors, warnings };
   }
@@ -326,13 +384,13 @@ export function validateTrpcCall(
     errors.push({
       message: `Procedure "${call.procedure}" is a ${procedureSchema.type}, but called as ${call.type}`,
       code: 'wrong_call_type',
-      position: call.position
+      position: call.position,
     });
   }
 
   // Validate input arguments with JSON Schema
   if (procedureSchema.inputSchema) {
-    const inputValidation = validateWithJsonSchema(call.args, procedureSchema.inputSchema);
+    const inputValidation = validateWithJsonSchema(call.args, procedureSchema.inputSchema, variableTypes);
 
     if (!inputValidation.success) {
       for (const jsonSchemaError of inputValidation.errors) {
@@ -345,7 +403,7 @@ export function validateTrpcCall(
       warnings.push({
         message: `Procedure "${call.procedure}" does not expect any input, but arguments were provided`,
         code: 'unexpected_input',
-        position: call.position
+        position: call.position,
       });
     }
   }
@@ -353,19 +411,20 @@ export function validateTrpcCall(
   return {
     isValid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
 export function validateCode(
   calls: TrpcCall[],
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map(),
 ): ValidationResult {
   const allErrors: ValidationError[] = [];
   const allWarnings: ValidationError[] = [];
 
   for (const call of calls) {
-    const result = validateTrpcCall(call, schema);
+    const result = validateTrpcCall(call, schema, variableTypes);
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
   }
@@ -373,7 +432,7 @@ export function validateCode(
   return {
     isValid: allErrors.length === 0,
     errors: allErrors,
-    warnings: allWarnings
+    warnings: allWarnings,
   };
 }
 
@@ -383,9 +442,14 @@ const validationCache = new Map<string, ValidationResult>();
 export function validateCodeWithCache(
   code: string,
   calls: TrpcCall[],
-  schema: RouterSchema
+  schema: RouterSchema,
+  variableTypes: Map<string, string> = new Map(),
 ): ValidationResult {
-  const cacheKey = `${code}-${JSON.stringify(schema)}`;
+  const varKey = [...variableTypes.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(',');
+  const cacheKey = `${code}-${JSON.stringify(schema)}-${varKey}`;
 
   if (validationCache.has(cacheKey)) {
     const cachedResult = validationCache.get(cacheKey);
@@ -394,7 +458,7 @@ export function validateCodeWithCache(
     }
   }
 
-  const result = validateCode(calls, schema);
+  const result = validateCode(calls, schema, variableTypes);
   validationCache.set(cacheKey, result);
 
   // Limit the size of the cache

@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from '../ThemeContext';
+import type { RouterSchema, Tab, Variable } from '../types';
 import { CodeEditor } from './CodeEditor';
-import { Tabs } from './Tabs';
-import { RouterSchema, Tab } from '../types';
 import { JsonViewer } from './JsonViewer';
-import { theme as t } from '../theme';
+import { Tabs } from './Tabs';
 
 const generateId = () => `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -17,73 +18,13 @@ interface TabCodeEditorProps {
   isLoading?: boolean;
   splitPosition: number;
   onSplitChange: (pct: number) => void;
+  mergedVariables?: Variable[];
+  onTabDrawerClick?: () => void;
+  fontSize?: number;
 }
 
 const DIVIDER_HIT = 16;
 const MIN_PANEL_PCT = 15;
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    height: '100%',
-    width: '100%'
-  },
-  viewers: {
-    display: 'flex',
-    gap: 16,
-    height: 'calc(100% - 40px)',
-    width: '100%',
-    minHeight: 0,
-  },
-  divider: {
-    width: DIVIDER_HIT,
-    cursor: 'col-resize',
-    flexShrink: 0,
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -DIVIDER_HIT / 2 + 0.5,
-    marginRight: -DIVIDER_HIT / 2 + 0.5,
-    zIndex: 2,
-  },
-  dividerLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: '1px',
-    backgroundColor: t.colors.border.primary,
-    transition: `background-color ${t.transition.fast}`,
-    pointerEvents: 'none',
-  },
-  dividerHandle: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '3px',
-    padding: '6px 2px',
-    borderRadius: t.radius.sm,
-    backgroundColor: t.colors.bg.primary,
-    border: `1px solid ${t.colors.border.primary}`,
-    transition: `all ${t.transition.fast}`,
-    pointerEvents: 'none',
-  },
-  dividerDot: {
-    width: 4,
-    height: 4,
-    borderRadius: '50%',
-    backgroundColor: t.colors.text.muted,
-    transition: `background-color ${t.transition.fast}`,
-  },
-  panel: {
-    overflow: 'hidden',
-    minWidth: 0,
-  },
-}
 
 export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   tabs,
@@ -95,17 +36,90 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   isLoading,
   splitPosition,
   onSplitChange,
+  mergedVariables,
+  onTabDrawerClick,
+  fontSize,
 }) => {
+  const theme = useTheme();
+
+  const styles: Record<string, React.CSSProperties> = useMemo(
+    () => ({
+      container: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        height: '100%',
+        width: '100%',
+      },
+      viewers: {
+        display: 'flex',
+        gap: 16,
+        height: 'calc(100% - 40px)',
+        width: '100%',
+        minHeight: 0,
+      },
+      divider: {
+        width: DIVIDER_HIT,
+        cursor: 'col-resize',
+        flexShrink: 0,
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: -DIVIDER_HIT / 2 + 0.5,
+        marginRight: -DIVIDER_HIT / 2 + 0.5,
+        zIndex: 2,
+      },
+      dividerLine: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: '50%',
+        width: '1px',
+        backgroundColor: theme.colors.border.primary,
+        transition: `background-color ${theme.transition.fast}`,
+        pointerEvents: 'none',
+      },
+      dividerHandle: {
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '3px',
+        padding: '6px 2px',
+        borderRadius: theme.radius.sm,
+        backgroundColor: theme.colors.bg.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        transition: `all ${theme.transition.fast}`,
+        pointerEvents: 'none',
+      },
+      dividerDot: {
+        width: 4,
+        height: 4,
+        borderRadius: '50%',
+        backgroundColor: theme.colors.text.muted,
+        transition: `background-color ${theme.transition.fast}`,
+      },
+      panel: {
+        overflow: 'hidden',
+        minWidth: 0,
+      },
+    }),
+    [theme],
+  );
+
   useEffect(() => {
     if (tabs.length === 0) {
       const defaultTab: Tab = {
         id: generateId(),
         title: 'Default tab',
         content: '// Exemple:\n// trpc.hello.query("monde")',
-        isActive: true
+        isActive: true,
+        variables: [],
+        headers: [],
       };
       onTabsChange([defaultTab]);
-    } else if (!tabs.some(tab => tab.isActive)) {
+    } else if (!tabs.some((tab) => tab.isActive)) {
       const updatedTabs = [...tabs];
       updatedTabs[0] = { ...updatedTabs[0], isActive: true };
       onTabsChange(updatedTabs);
@@ -113,18 +127,20 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   }, [tabs, onTabsChange]);
 
   const handleTabClick = (tabId: string) => {
-    onTabsChange(tabs.map(tab => ({
-      ...tab,
-      isActive: tab.id === tabId
-    })));
+    onTabsChange(
+      tabs.map((tab) => ({
+        ...tab,
+        isActive: tab.id === tabId,
+      })),
+    );
   };
 
   const handleTabClose = (tabId: string) => {
     if (tabs.length <= 1) return;
 
-    const tabIndex = tabs.findIndex(tab => tab.id === tabId);
+    const tabIndex = tabs.findIndex((tab) => tab.id === tabId);
     const isActiveTab = tabs[tabIndex].isActive;
-    const newTabs = tabs.filter(tab => tab.id !== tabId);
+    const newTabs = tabs.filter((tab) => tab.id !== tabId);
 
     if (isActiveTab && newTabs.length > 0) {
       const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
@@ -135,32 +151,30 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   };
 
   const handleTabAdd = () => {
-    const updatedTabs = tabs.map(tab => ({
+    const updatedTabs = tabs.map((tab) => ({
       ...tab,
-      isActive: false
+      isActive: false,
     }));
 
     const newTab: Tab = {
       id: generateId(),
       title: `Tab ${tabs.length + 1}`,
       content: '// Exemple:\n// trpc.hello.query("monde")',
-      isActive: true
+      isActive: true,
+      variables: [],
+      headers: [],
     };
 
     onTabsChange([...updatedTabs, newTab]);
   };
 
   const handleTabRename = (tabId: string, newTitle: string) => {
-    onTabsChange(tabs.map(tab =>
-      tab.id === tabId
-        ? { ...tab, title: newTitle }
-        : tab
-    ));
+    onTabsChange(tabs.map((tab) => (tab.id === tabId ? { ...tab, title: newTitle } : tab)));
   };
 
   const handleTabReorder = (fromId: string, toId: string) => {
-    const fromIndex = tabs.findIndex(tab => tab.id === fromId);
-    const toIndex = tabs.findIndex(tab => tab.id === toId);
+    const fromIndex = tabs.findIndex((tab) => tab.id === fromId);
+    const toIndex = tabs.findIndex((tab) => tab.id === toId);
 
     if (fromIndex === -1 || toIndex === -1) return;
 
@@ -172,44 +186,50 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   };
 
   const handleCodeChange = (newValue: string) => {
-    onTabsChange(tabs.map(tab =>
-      tab.isActive ? { ...tab, content: newValue } : tab
-    ));
+    onTabsChange(tabs.map((tab) => (tab.isActive ? { ...tab, content: newValue } : tab)));
   };
 
-  const activeTab = tabs.find(tab => tab.isActive);
+  const activeTab = tabs.find((tab) => tab.isActive);
 
   const [leftPct, setLeftPct] = useState(splitPosition);
-  useEffect(() => { setLeftPct(splitPosition); }, [splitPosition]);
+  useEffect(() => {
+    setLeftPct(splitPosition);
+  }, [splitPosition]);
   const viewersRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    dragging.current = true;
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragging.current = true;
 
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!dragging.current || !viewersRef.current) return;
-      const rect = viewersRef.current.getBoundingClientRect();
-      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      const clamped = Math.min(100 - MIN_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct));
-      setLeftPct(clamped);
-    };
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!dragging.current || !viewersRef.current) return;
+        const rect = viewersRef.current.getBoundingClientRect();
+        const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+        const clamped = Math.min(100 - MIN_PANEL_PCT, Math.max(MIN_PANEL_PCT, pct));
+        setLeftPct(clamped);
+      };
 
-    const onMouseUp = () => {
-      dragging.current = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setLeftPct((current) => { onSplitChange(current); return current; });
-    };
+      const onMouseUp = () => {
+        dragging.current = false;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setLeftPct((current) => {
+          onSplitChange(current);
+          return current;
+        });
+      };
 
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [onSplitChange]);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [onSplitChange],
+  );
 
   return (
     <div style={styles.container}>
@@ -226,10 +246,14 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
         <div style={{ ...styles.panel, width: `${leftPct}%` }}>
           {activeTab && (
             <CodeEditor
+              key={activeTab.id}
               value={activeTab.content}
               onChange={handleCodeChange}
               schema={schema}
               onPlayRequest={onPlayRequest}
+              variables={mergedVariables}
+              onTabDrawerClick={onTabDrawerClick}
+              fontSize={fontSize}
             />
           )}
         </div>
@@ -239,17 +263,21 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
           onMouseOver={(e) => {
             const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
             const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
-            if (line) line.style.backgroundColor = t.colors.accent.primary;
-            if (handle) handle.style.borderColor = t.colors.accent.primary;
-            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach(d => d.style.backgroundColor = t.colors.text.secondary);
+            if (line) line.style.backgroundColor = theme.colors.accent.primary;
+            if (handle) handle.style.borderColor = theme.colors.accent.primary;
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach((d) => {
+              d.style.backgroundColor = theme.colors.text.secondary;
+            });
           }}
           onMouseOut={(e) => {
             if (dragging.current) return;
             const line = e.currentTarget.querySelector<HTMLElement>('[data-divider-line]');
             const handle = e.currentTarget.querySelector<HTMLElement>('[data-divider-handle]');
-            if (line) line.style.backgroundColor = t.colors.border.primary;
-            if (handle) handle.style.borderColor = t.colors.border.primary;
-            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach(d => d.style.backgroundColor = t.colors.text.muted);
+            if (line) line.style.backgroundColor = theme.colors.border.primary;
+            if (handle) handle.style.borderColor = theme.colors.border.primary;
+            e.currentTarget.querySelectorAll<HTMLElement>('[data-divider-dot]').forEach((d) => {
+              d.style.backgroundColor = theme.colors.text.muted;
+            });
           }}
         >
           <div data-divider-line="" style={styles.dividerLine} />
@@ -260,11 +288,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
           </div>
         </div>
         <div style={{ ...styles.panel, width: `${100 - leftPct}%` }}>
-          <JsonViewer
-            value={resultValue}
-            onChange={onResultChange}
-            isLoading={isLoading}
-          />
+          <JsonViewer value={resultValue} onChange={onResultChange} isLoading={isLoading} fontSize={fontSize} />
         </div>
       </div>
     </div>

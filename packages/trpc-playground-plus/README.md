@@ -11,15 +11,20 @@
 - 📋 **Intuitive and modern user interface**
 - 📑 **Tab system** to organize your queries/mutations
 - 💾 **Export and import** queries to share with your team
-- 🔄 **Automatic loading** of exported data (Tabs, Headers, etc.)
-- 🔧 **HTTP headers customization**
+- 🔄 **Default data loading** for new users (Tabs, Headers, etc.)
+- 🔧 **HTTP headers customization** (global & per-tab)
+- 🧬 **Variables support** with type validation (global & per-tab)
+- 🎨 **Light & dark themes**
+- ⚙️ **Customizable settings** (font size, timeout, split)
+- ✨ **Smart autocomplete & inline linting** based on your tRPC schema
+- 🪄 **Built-in code formatter**
+- 🏢 **Monorepo-friendly** (isolate data per project)
 - 🔌 **Adapters** for Fastify
 
 ## 🛠️ Coming Soon
 
 - 🌈 **Support for more frameworks** (Express, Koa, etc.)
 - 🧩 **More configuration options** to customize your experience
-- 🎨 **Customizable themes (light/dark)**
 - ...and much more!
 
 Feel free to suggest ideas or contribute on [GitHub](https://github.com/raesta/trpc-playground-plus) !
@@ -40,37 +45,39 @@ pnpm add trpc-playground-plus
 
 ## 🚀 Quick Start
 
-### With Fastify
+<details open>
+  <summary>With Fastify</summary>
 
-```typescript
-import { createFastifyAdapter } from 'trpc-playground-plus/adapters/fastify';
-import { fastify } from 'fastify';
-import { appRouter } from './router';
+  ```typescript
+  import { createFastifyAdapter } from 'trpc-playground-plus/adapters/fastify';
+  import { fastify } from 'fastify';
+  import { appRouter } from './router';
 
-const app = fastify();
+  const app = fastify();
 
-// Playground configuration
-await createFastifyAdapter({
-  app,
-  trpcEndpoint: 'http://localhost:3000/api/trpc',
-  router: appRouter,
-  playgroundEndpoint: '/playground'
-});
+  // Playground configuration
+  await createFastifyAdapter({
+    app,
+    trpcEndpoint: 'http://localhost:3000/api/trpc',
+    router: appRouter,
+    playgroundEndpoint: '/playground'
+  });
 
-// Start server
-await app.listen({ port: 3000 });
-console.log('🚀 Server available at http://localhost:3000');
-console.log('🚀 Playground available at http://localhost:3000/playground');
-```
+  // Start server
+  await app.listen({ port: 3000 });
+  console.log('🚀 Server available at http://localhost:3000');
+  console.log('🚀 Playground available at http://localhost:3000/playground');
+  ```
+</details>
 
-## 📋 Loading Predefined Queries
+## 📋 Loading Default Queries
 
 ### Method: Configuration via an object or Json file
 
 ```typescript
 import { createFastifyAdapter } from 'trpc-playground-plus/adapters/fastify';
 
-const myTabs = {
+const myData = {
   tabs: [
     {
       id: "tab-1",
@@ -93,7 +100,7 @@ await createFastifyAdapter({
   trpcEndpoint: '/api/trpc',
   playgroundEndpoint: '/playground',
   router: appRouter,
-  defaultData: myTabs
+  defaultData: myData // <- defaultData is optional but recommended for new user
 });
 ```
 
@@ -101,10 +108,37 @@ await createFastifyAdapter({
 
 | Option | Type | Description | Default |
 |--------|------|-------------|------------|
+| `app` | `FastifyInstance` | Fastify instance | (required) |
 | `trpcEndpoint` | `string` | tRPC API Endpoint | (required) |
 | `router` | `Router` | tRPC Router | (required) |
 | `playgroundEndpoint` | `string` | Playground path | `/playground` |
-| `defaultData` | `object` | Path to configuration file or object | `undefined` |
+| `transformer` | `'superjson'` | Data transformer used by your tRPC client | `undefined` |
+| `defaultData` | `ExportData` | Default tabs/headers to bootstrap the playground | `undefined` |
+| `projectKey` | `string` | Prefix for localStorage keys (monorepo isolation) | `undefined` |
+
+## 🏢 Monorepo Support
+
+If you use **trpc-playground-plus** in multiple projects served on the same domain (typical in a monorepo), the localStorage data would normally collide. Set a unique `projectKey` per project to isolate them:
+
+```typescript
+// App A
+await createFastifyAdapter({
+  app,
+  trpcEndpoint: '/api/trpc',
+  router: appRouter,
+  projectKey: 'app-a',
+});
+
+// App B (different project in same monorepo)
+await createFastifyAdapter({
+  app,
+  trpcEndpoint: '/api/trpc',
+  router: appRouter,
+  projectKey: 'app-b',
+});
+```
+
+localStorage keys are then prefixed (e.g. `app-a:trpc-playground-tabs`), avoiding collisions. The `projectKey` is also embedded in exported JSON files so imports can warn when data is brought over from a different project.
 
 ## 🔧 Compatibility
 

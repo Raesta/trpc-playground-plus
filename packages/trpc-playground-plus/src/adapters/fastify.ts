@@ -1,13 +1,14 @@
-import { type FastifyInstance } from 'fastify';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
-import { AnyTRPCRouter } from '@trpc/server';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-import { type RouterSchema } from '../types';
+import type { AnyTRPCRouter } from '@trpc/server';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { RouterSchema } from '../types';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));const distAppPath = path.resolve(__dirname, './app');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distAppPath = path.resolve(__dirname, './app');
 
 const TabSchema = z.object({
   id: z.string(),
@@ -29,7 +30,7 @@ const ExportDataSchema = z.object({
 });
 type ExportData = z.infer<typeof ExportDataSchema>;
 
-type ProcedureWithDef = Function & { _def?: { type?: string } };
+type ProcedureWithDef = ((...args: unknown[]) => unknown) & { _def?: { type?: string } };
 
 function hasDef(fn: unknown): fn is ProcedureWithDef {
   return typeof fn === 'function' && '_def' in fn;
@@ -45,7 +46,7 @@ function extractProcedureSchemas(def: any) {
       inputSchema: inputSchema ? z.toJSONSchema(inputSchema, { unrepresentable: 'any' }) : null,
       outputSchema: outputSchema ? z.toJSONSchema(outputSchema, { unrepresentable: 'any' }) : null,
       inputZodSchema: inputSchema || null,
-      outputZodSchema: outputSchema || null
+      outputZodSchema: outputSchema || null,
     };
   } catch (error) {
     console.warn('Error extracting schemas:', error);
@@ -53,7 +54,7 @@ function extractProcedureSchemas(def: any) {
       inputSchema: null,
       outputSchema: null,
       inputZodSchema: null,
-      outputZodSchema: null
+      outputZodSchema: null,
     };
   }
 }
@@ -66,28 +67,20 @@ function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
 
     if (hasDef(value) && value._def) {
       const def = value._def;
-      const type: 'query' | 'mutation' | 'router' = def.type === 'query'
-        ? 'query'
-        : def.type === 'mutation'
-        ? 'mutation'
-        : 'router';
+      const type: 'query' | 'mutation' | 'router' =
+        def.type === 'query' ? 'query' : def.type === 'mutation' ? 'mutation' : 'router';
 
       const schemas = extractProcedureSchemas(def);
       structure[key] = { type, ...schemas };
     } else if (typeof value === 'object' && value !== null) {
-      const hasProcedure = Object.values(value).some(
-        (v) => hasDef(v) && v._def
-      );
+      const hasProcedure = Object.values(value).some((v) => hasDef(v) && v._def);
 
       if (hasProcedure) {
         Object.entries(value).forEach(([subKey, subValue]) => {
           if (hasDef(subValue) && subValue._def) {
             const def = subValue._def;
-            const type: 'query' | 'mutation' | 'router' = def.type === 'query'
-              ? 'query'
-              : def.type === 'mutation'
-              ? 'mutation'
-              : 'router';
+            const type: 'query' | 'mutation' | 'router' =
+              def.type === 'query' ? 'query' : def.type === 'mutation' ? 'mutation' : 'router';
 
             const schemas = extractProcedureSchemas(def);
             if (!structure[key]) structure[key] = { type: 'router', children: {} };
@@ -97,7 +90,7 @@ function extractRouterStructure(router: AnyTRPCRouter): RouterSchema {
       } else {
         structure[key] = {
           type: 'router',
-          children: extractRouterStructure(value as AnyTRPCRouter)
+          children: extractRouterStructure(value as AnyTRPCRouter),
         };
       }
     }
@@ -113,7 +106,7 @@ function stripZodSchemasForClient(schema: RouterSchema): RouterSchema {
     if (value.type === 'router') {
       stripped[key] = {
         type: 'router',
-        children: value.children ? stripZodSchemasForClient(value.children) : undefined
+        children: value.children ? stripZodSchemasForClient(value.children) : undefined,
       };
     } else {
       // Keep only inputSchema and outputSchema (JSON), not the Zod schemas
@@ -132,6 +125,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   router,
   playgroundEndpoint = '/playground',
   defaultData = {},
+  projectKey,
 }: {
   app: FastifyInstance;
   trpcEndpoint: string;
@@ -139,13 +133,16 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   transformer?: 'superjson';
   playgroundEndpoint?: string;
   defaultData?: ExportData;
+  projectKey?: string;
 }) {
   if (!app || typeof app !== 'object') {
     throw new Error('Invalid app parameter: app must be a FastifyInstance');
   }
 
   if (typeof app.register !== 'function') {
-    throw new Error('Invalid app parameter: app.register is not a function. Make sure you are passing a valid FastifyInstance');
+    throw new Error(
+      'Invalid app parameter: app.register is not a function. Make sure you are passing a valid FastifyInstance',
+    );
   }
 
   const validatedData = ExportDataSchema.safeParse(defaultData);
@@ -160,11 +157,13 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
     await app.register(fastifyStatic, {
       root: distAppPath,
       prefix: playgroundEndpoint,
-      decorateReply: false
+      decorateReply: false,
     });
   } catch (error) {
     console.error('Error registering fastify-static plugin:', error);
-    throw new Error(`Failed to register fastify-static plugin: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to register fastify-static plugin: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   app.get(playgroundEndpoint, (_, reply) => {
@@ -173,8 +172,8 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
 
     html = html.replaceAll(
       `<script type="module" src="app.js"></script>`,
-      `<script type="module" src="${playgroundEndpoint}/app.js"></script>`
-    )
+      `<script type="module" src="${playgroundEndpoint}/app.js"></script>`,
+    );
 
     reply.type('text/html').send(html);
   });
@@ -186,10 +185,18 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
     reply.send({
       trpcEndpoint,
       transformer,
+      projectKey,
       endpoints: Object.keys(router._def.procedures),
       schema: stripZodSchemasForClient(routerStructure),
-      defaultTabs: defaultData?.tabs || [{ id: 'example-tab-1', title: 'Example 1', content: 'trpc.hello.query({ name: \'monde test\' })', isActive: true }],
-      defaultHeaders: defaultData?.headers || []
+      defaultTabs: defaultData?.tabs || [
+        {
+          id: 'example-tab-1',
+          title: 'Example 1',
+          content: "trpc.hello.query({ name: 'monde test' })",
+          isActive: true,
+        },
+      ],
+      defaultHeaders: defaultData?.headers || [],
     });
   });
 

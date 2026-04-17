@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { theme as t } from '../theme';
+import type React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from '../ThemeContext';
 
 interface Tab {
   id: string;
@@ -17,65 +18,76 @@ interface TabsProps {
   onTabReorder?: (fromId: string, toId: string) => void;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tab: {
-    padding: '6px 12px',
-    color: t.colors.text.primary,
-    cursor: 'pointer',
-    border: `1px solid ${t.colors.border.primary}`,
-    borderRadius: t.radius.md,
-    display: 'flex',
-    alignItems: 'center',
-    position: 'relative',
-    transition: `background-color ${t.transition.normal}`,
-    minWidth: '120px'
-  },
-  title: {
-    marginRight: '16px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    fontSize: t.font.size.md,
-  },
-  input: {
-    width: 'calc(100% - 24px)',
-  },
-  closeButton: {
-    background: 'none',
-    border: 'none',
-    color: t.colors.text.secondary,
-    fontSize: t.font.size.md,
-    cursor: 'pointer',
-    padding: '0 4px',
-    position: 'absolute',
-    right: '4px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    transition: `color ${t.transition.fast}`,
-  },
-  addButton: {
-    backgroundColor: t.colors.bg.primary,
-    color: t.colors.text.primary,
-    border: `1px solid ${t.colors.border.primary}`,
-    padding: '6px 12px',
-    borderRadius: t.radius.md,
-    cursor: 'pointer',
-    fontSize: t.font.size.md,
-    transition: `background-color ${t.transition.normal}`,
-  },
-}
-
 export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabAdd, onTabRename, onTabReorder }) => {
+  const theme = useTheme();
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const styles: Record<string, React.CSSProperties> = useMemo(
+    () => ({
+      container: {
+        display: 'flex',
+        flexDirection: 'row',
+        gap: 8,
+      },
+      tab: {
+        padding: '6px 12px',
+        color: theme.colors.text.primary,
+        cursor: 'pointer',
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.md,
+        display: 'flex',
+        alignItems: 'center',
+        position: 'relative',
+        transition: `background-color ${theme.transition.normal}`,
+        minWidth: '120px',
+      },
+      title: {
+        marginRight: '16px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        fontSize: theme.font.size.md,
+      },
+      input: {
+        width: 'calc(100% - 24px)',
+        background: theme.colors.bg.secondary,
+        color: theme.colors.text.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.sm,
+        fontSize: theme.font.size.md,
+        padding: '2px 4px',
+        outline: 'none',
+      },
+      closeButton: {
+        background: 'none',
+        border: 'none',
+        color: theme.colors.text.secondary,
+        fontSize: theme.font.size.md,
+        cursor: 'pointer',
+        padding: '0 4px',
+        position: 'absolute',
+        right: '4px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        transition: `color ${theme.transition.fast}`,
+      },
+      addButton: {
+        backgroundColor: theme.colors.bg.primary,
+        color: theme.colors.text.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        padding: '6px 12px',
+        borderRadius: theme.radius.md,
+        cursor: 'pointer',
+        fontSize: theme.font.size.md,
+        transition: `background-color ${theme.transition.normal}`,
+      },
+    }),
+    [theme],
+  );
 
   useEffect(() => {
     if (editingTabId && inputRef.current) {
@@ -138,12 +150,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
     const y = e.clientY;
 
     // Check if we are still in the tab area (with a margin for the drop zone)
-    if (
-      x < rect.left - 140 ||
-      x > rect.right + 140 ||
-      y < rect.top ||
-      y > rect.bottom
-    ) {
+    if (x < rect.left - 140 || x > rect.right + 140 || y < rect.top || y > rect.bottom) {
       setDragOverTabId(null);
     }
   };
@@ -167,19 +174,21 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      gap: 8,
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: 8,
+      }}
+    >
       {tabs.map((tab, index) => {
         const isDragging = draggedTabId === tab.id;
         const isDragOver = dragOverTabId === tab.id;
         const isDraggable = editingTabId !== tab.id; // Do not allow dragging while editing
 
         // Calculate the position of the drop indicator
-        const draggedIndex = draggedTabId ? tabs.findIndex(t => t.id === draggedTabId) : -1;
-        const draggedTab = draggedTabId ? tabs.find(t => t.id === draggedTabId) : null;
+        const draggedIndex = draggedTabId ? tabs.findIndex((t) => t.id === draggedTabId) : -1;
+        const draggedTab = draggedTabId ? tabs.find((t) => t.id === draggedTabId) : null;
         const showDropIndicator = isDragOver && draggedIndex !== -1 && draggedIndex !== index;
 
         return (
@@ -196,122 +205,119 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, onTabClick, onTabClose, onTabA
             onDragEnd={handleDragEnd}
             style={{
               ...styles.tab,
-              backgroundColor: tab.isActive ? t.colors.bg.active : t.colors.bg.primary,
+              backgroundColor: tab.isActive ? theme.colors.bg.active : theme.colors.bg.primary,
               marginBottom: tab.isActive ? '-1px' : '0',
               opacity: isDragging ? 0.5 : 1,
               cursor: isDraggable ? 'grab' : 'default',
-              border: `1px solid ${t.colors.border.primary}`,
-              transition: `opacity ${t.transition.normal}, margin 0.15s ease-out`,
+              border: `1px solid ${theme.colors.border.primary}`,
+              transition: `opacity ${theme.transition.normal}, margin 0.15s ease-out`,
               position: 'relative',
               marginLeft: showDropIndicator && draggedIndex > index ? '132px' : '0',
               marginRight: showDropIndicator && draggedIndex < index ? '132px' : '0',
             }}
             onMouseOver={(e) => {
               if (!tab.isActive) {
-                e.currentTarget.style.backgroundColor = t.colors.bg.hover;
+                e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
               }
             }}
             onMouseOut={(e) => {
               if (!tab.isActive) {
-                e.currentTarget.style.backgroundColor = t.colors.bg.primary;
+                e.currentTarget.style.backgroundColor = theme.colors.bg.primary;
               }
             }}
           >
-          {showDropIndicator && draggedTab && (
-            <>
-              {/* Invisible drop zone to extend clickable area */}
-              <div
-                onDragOver={(e) => {
-                  e.stopPropagation();
-                  handleDragOver(e, tab.id);
-                }}
-                onDrop={(e) => handleDrop(e, tab.id)}
-                onDragLeave={handleDragLeave}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: draggedIndex > index ? '-132px' : 'auto',
-                  right: draggedIndex < index ? '-132px' : 'auto',
-                  width: '120px',
-                  height: '100%',
-                  pointerEvents: 'auto',
-                }}
-              />
-              {/* Visual preview of the tab */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: draggedIndex > index ? '-132px' : 'auto',
-                  right: draggedIndex < index ? '-132px' : 'auto',
-                  padding: '6px 12px',
-                  color: t.colors.text.secondary,
-                  border: `2px dashed ${t.colors.border.secondary}`,
-                  borderRadius: t.radius.md,
-                  display: 'flex',
-                  alignItems: 'center',
-                  minWidth: '120px',
-                  backgroundColor: 'rgba(45, 45, 74, 0.3)',
-                  boxShadow: t.shadow.sm,
-                  pointerEvents: 'none',
-                }}
-              >
-                <span
+            {showDropIndicator && draggedTab && (
+              <>
+                {/* Invisible drop zone to extend clickable area */}
+                <div
+                  onDragOver={(e) => {
+                    e.stopPropagation();
+                    handleDragOver(e, tab.id);
+                  }}
+                  onDrop={(e) => handleDrop(e, tab.id)}
+                  onDragLeave={handleDragLeave}
                   style={{
-                    marginRight: '16px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontSize: '14px',
+                    position: 'absolute',
+                    top: 0,
+                    left: draggedIndex > index ? '-132px' : 'auto',
+                    right: draggedIndex < index ? '-132px' : 'auto',
+                    width: '120px',
+                    height: '100%',
+                    pointerEvents: 'auto',
+                  }}
+                />
+                {/* Visual preview of the tab */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: draggedIndex > index ? '-132px' : 'auto',
+                    right: draggedIndex < index ? '-132px' : 'auto',
+                    padding: '6px 12px',
+                    color: theme.colors.text.secondary,
+                    border: `2px dashed ${theme.colors.border.secondary}`,
+                    borderRadius: theme.radius.md,
+                    display: 'flex',
+                    alignItems: 'center',
+                    minWidth: '120px',
+                    backgroundColor: 'rgba(45, 45, 74, 0.3)',
+                    boxShadow: theme.shadow.sm,
+                    pointerEvents: 'none',
                   }}
                 >
-                  {draggedTab.title}
-                </span>
-              </div>
-            </>
-          )}
-          {editingTabId === tab.id ? (
-            <input
-              ref={inputRef}
-              value={editingTitle}
-              onChange={handleInputChange}
-              onBlur={handleInputBlur}
-              onKeyDown={handleInputKeyDown}
-              className="tab-edit-input"
-              style={styles.input}
-            />
-          ) : (
-            <span
-              style={styles.title}
-              title="Double-click to edit"
+                  <span
+                    style={{
+                      marginRight: '16px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: '14px',
+                    }}
+                  >
+                    {draggedTab.title}
+                  </span>
+                </div>
+              </>
+            )}
+            {editingTabId === tab.id ? (
+              <input
+                ref={inputRef}
+                value={editingTitle}
+                onChange={handleInputChange}
+                onBlur={handleInputBlur}
+                onKeyDown={handleInputKeyDown}
+                className="tab-edit-input"
+                style={styles.input}
+              />
+            ) : (
+              <span style={styles.title} title="Double-click to edit">
+                {tab.title}
+              </span>
+            )}
+            <button
+              className="tab-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTabClose(tab.id);
+              }}
+              style={styles.closeButton}
+              onMouseOver={(e) => {
+                e.currentTarget.style.color = theme.colors.text.primary;
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.color = theme.colors.text.secondary;
+              }}
             >
-              {tab.title}
-            </span>
-          )}
-          <button
-            className="tab-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTabClose(tab.id);
-            }}
-            style={styles.closeButton}
-            onMouseOver={(e) => {
-              e.currentTarget.style.color = t.colors.text.primary;
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.color = t.colors.text.secondary;
-            }}
-          >
-            ×
-          </button>
-        </div>
+              ×
+            </button>
+          </div>
         );
       })}
       <button
         onClick={onTabAdd}
         style={styles.addButton}
-        onMouseOver={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.hover}
-        onMouseOut={(e) => e.currentTarget.style.backgroundColor = t.colors.bg.primary}
+        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
       >
         +
       </button>

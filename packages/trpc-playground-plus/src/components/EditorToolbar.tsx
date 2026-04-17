@@ -1,67 +1,101 @@
-import React, { useCallback } from 'react';
-import { ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { unfoldAll, foldable, foldEffect } from '@codemirror/language';
-import { EditorView } from '@codemirror/view';
-import { theme as t } from '../theme';
+import { foldable, foldEffect, unfoldAll } from '@codemirror/language';
+import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
+import type React from 'react';
+import { useCallback, useMemo } from 'react';
+import { useTheme } from '../ThemeContext';
 
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
+  onTabDrawerClick?: () => void;
+  onFormat?: () => void;
   children?: React.ReactNode;
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: '4px',
-    padding: '4px 8px',
-    backgroundColor: t.colors.bg.primary,
-    borderBottom: `1px solid ${t.colors.border.primary}`,
-    flexShrink: 0,
-  },
-  btn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'none',
-    border: '1px solid transparent',
-    borderRadius: t.radius.sm,
-    color: t.colors.text.secondary,
-    fontSize: '13px',
-    padding: '2px 6px',
-    cursor: 'pointer',
-    transition: `all ${t.transition.fast}`,
-    lineHeight: 1,
-  },
-};
 
 const ToolbarButton: React.FC<{
   title: string;
   onClick: () => void;
+  variant?: 'icon' | 'pill';
   children: React.ReactNode;
-}> = ({ title, onClick, children }) => (
-  <button
-    title={title}
-    onClick={onClick}
-    style={styles.btn}
-    onMouseOver={(e) => {
-      e.currentTarget.style.backgroundColor = t.colors.bg.hover;
-      e.currentTarget.style.borderColor = t.colors.border.primary;
-      e.currentTarget.style.color = t.colors.text.primary;
-    }}
-    onMouseOut={(e) => {
-      e.currentTarget.style.backgroundColor = 'transparent';
-      e.currentTarget.style.borderColor = 'transparent';
-      e.currentTarget.style.color = t.colors.text.secondary;
-    }}
-  >
-    {children}
-  </button>
-);
+}> = ({ title, onClick, variant = 'icon', children }) => {
+  const theme = useTheme();
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, children }) => {
+  const styles = useMemo(
+    () => ({
+      btn: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'none',
+        border: '1px solid transparent',
+        borderRadius: theme.radius.sm,
+        color: theme.colors.text.secondary,
+        fontSize: '13px',
+        padding: '2px 6px',
+        cursor: 'pointer',
+        transition: `all ${theme.transition.fast}`,
+        lineHeight: 1,
+      } as React.CSSProperties,
+      pill: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.bg.primary,
+        border: `1px solid ${theme.colors.border.primary}`,
+        borderRadius: theme.radius.md,
+        color: theme.colors.text.primary,
+        fontSize: '13px',
+        padding: '4px 10px',
+        cursor: 'pointer',
+        transition: `background-color ${theme.transition.normal}`,
+        lineHeight: 1,
+        gap: '5px',
+      } as React.CSSProperties,
+    }),
+    [theme],
+  );
+
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      style={variant === 'pill' ? styles.pill : styles.btn}
+      onMouseOver={(e) => {
+        e.currentTarget.style.backgroundColor = theme.colors.bg.hover;
+        if (variant === 'icon') {
+          e.currentTarget.style.borderColor = theme.colors.border.secondary;
+        }
+        e.currentTarget.style.color = theme.colors.text.primary;
+      }}
+      onMouseOut={(e) => {
+        e.currentTarget.style.backgroundColor = variant === 'pill' ? theme.colors.bg.primary : 'transparent';
+        e.currentTarget.style.borderColor = variant === 'pill' ? theme.colors.border.primary : 'transparent';
+        e.currentTarget.style.color = variant === 'pill' ? theme.colors.text.primary : theme.colors.text.secondary;
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, onFormat, children }) => {
+  const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
+
+  const styles = useMemo(
+    () => ({
+      toolbar: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '4px',
+        padding: '4px 8px',
+        backgroundColor: theme.colors.bg.primary,
+        borderBottom: `1px solid ${theme.colors.border.primary}`,
+        flexShrink: 0,
+      } as React.CSSProperties,
+    }),
+    [theme],
+  );
 
   const handleFoldAll = useCallback(() => {
     const view = getView();
@@ -95,19 +129,90 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, childre
 
   return (
     <div style={styles.toolbar}>
-      <ToolbarButton title="Fold all" onClick={handleFoldAll}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="4 14 12 6 20 14" />
-          <polyline points="4 22 12 14 20 22" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton title="Unfold all" onClick={handleUnfoldAll}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="4 6 12 14 20 6" />
-          <polyline points="4 14 12 22 20 14" />
-        </svg>
-      </ToolbarButton>
-      {children}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onTabDrawerClick && (
+          <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick} variant="pill">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+            Headers & Variables
+          </ToolbarButton>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onFormat && (
+          <ToolbarButton title="Format code (Shift+Alt+F)" onClick={onFormat} variant="pill">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M15 4V2" />
+              <path d="M15 16v-2" />
+              <path d="M8 9h2" />
+              <path d="M20 9h2" />
+              <path d="M17.8 11.8 19 13" />
+              <path d="M15 9h0" />
+              <path d="M17.8 6.2 19 5" />
+              <path d="M3 21l9-9" />
+              <path d="M12.2 6.2 11 5" />
+            </svg>
+          </ToolbarButton>
+        )}
+        <ToolbarButton title="Fold all" onClick={handleFoldAll} variant="pill">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="4 14 12 6 20 14" />
+            <polyline points="4 22 12 14 20 22" />
+          </svg>
+        </ToolbarButton>
+        <ToolbarButton title="Unfold all" onClick={handleUnfoldAll} variant="pill">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="4 6 12 14 20 6" />
+            <polyline points="4 14 12 22 20 14" />
+          </svg>
+        </ToolbarButton>
+        {children}
+      </div>
     </div>
   );
 };

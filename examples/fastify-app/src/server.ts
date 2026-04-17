@@ -1,12 +1,12 @@
-import fastify from 'fastify'
+import { initTRPC } from '@trpc/server';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
-import { initTRPC } from '@trpc/server'
-import { z } from 'zod'
-import { createFastifyAdapter } from 'trpc-playground-plus'
-import trpcPlaygroundTabs from './trpc-playground-tabs.json'
+import fastify from 'fastify';
+import { createFastifyAdapter } from 'trpc-playground-plus';
+import { z } from 'zod';
+import trpcPlaygroundTabs from './trpc-playground-tabs.json';
 
-const app = fastify()
-const t = initTRPC.create()
+const app = fastify();
+const t = initTRPC.create();
 
 // Create a nested router for users
 const userRouter = t.router({
@@ -18,7 +18,7 @@ const userRouter = t.router({
   create: t.procedure
     .input(z.object({ name: z.string(), email: z.string() }))
     .output(z.object({ message: z.string() }))
-    .mutation(({ input }) => ({ message: `User created: ${input.name}` }))
+    .mutation(({ input }) => ({ message: `User created: ${input.name}` })),
 });
 
 // Create a nested router for posts
@@ -31,7 +31,7 @@ const postRouter = t.router({
   create: t.procedure
     .input(z.object({ title: z.string(), content: z.string() }))
     .output(z.object({ message: z.string() }))
-    .mutation(({ input }) => ({ message: `Post created: ${input.title}` }))
+    .mutation(({ input }) => ({ message: `Post created: ${input.title}` })),
 });
 
 // Create the main router
@@ -49,7 +49,7 @@ const appRouter = t.router({
   test: t.procedure
     .input(z.string())
     .output(z.string())
-    .query(({ input }) => (input)),
+    .query(({ input }) => input),
 
   testSubRouter: t.router({
     test: t.procedure
@@ -59,45 +59,49 @@ const appRouter = t.router({
   }),
 
   testSubObject: t.procedure
-    .input(z.object({
-      name: z.string(),
-      obj: z.object({
-        text: z.string()
+    .input(
+      z.object({
+        name: z.string(),
+        obj: z.object({
+          text: z.string(),
+        }),
       }),
-    }))
+    )
     .output(z.object({}))
     .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
 
   testSubArray: t.procedure
     .input(
       z.object({
-      name: z.string(),
-      obj: z.object({
-        text: z.string()
+        name: z.string(),
+        obj: z.object({
+          text: z.string(),
+        }),
       }),
-    }))
+    )
     .output(z.object({}))
     .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
 
   user: userRouter,
-  post: postRouter
+  post: postRouter,
 });
 
 app.register(fastifyTRPCPlugin, {
   prefix: '/trpc',
   trpcOptions: {
     router: appRouter,
-  }
-})
+  },
+});
 
 const playground = await createFastifyAdapter({
   app,
   trpcEndpoint: '/trpc',
   router: appRouter,
   playgroundEndpoint: '/playground',
-  defaultData: trpcPlaygroundTabs
-})
+  defaultData: trpcPlaygroundTabs,
+  projectKey: 'funnel-api',
+});
 
 playground.listen({ port: 4000 }, () => {
-  console.log('🚀 Playground running at http://localhost:4000/playground')
-})
+  console.log('🚀 Playground running at http://localhost:4000/playground');
+});
