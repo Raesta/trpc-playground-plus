@@ -7,6 +7,7 @@ import { useTheme } from '../ThemeContext';
 interface EditorToolbarProps {
   editorRef: React.RefObject<ReactCodeMirrorRef | null>;
   onTabDrawerClick?: () => void;
+  tabDrawerErrors?: string[];
   onFormat?: () => void;
   children?: React.ReactNode;
 }
@@ -77,7 +78,13 @@ const ToolbarButton: React.FC<{
   );
 };
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDrawerClick, onFormat, children }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({
+  editorRef,
+  onTabDrawerClick,
+  tabDrawerErrors,
+  onFormat,
+  children,
+}) => {
   const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
 
@@ -131,7 +138,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
     <div style={styles.toolbar}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         {onTabDrawerClick && (
-          <ToolbarButton title="Tab Headers & Variables" onClick={onTabDrawerClick} variant="pill">
+          <ToolbarButton
+            title={
+              tabDrawerErrors && tabDrawerErrors.length > 0
+                ? `${tabDrawerErrors.length} error(s):\n${tabDrawerErrors.join('\n')}`
+                : 'Tab Headers & Variables'
+            }
+            onClick={onTabDrawerClick}
+            variant="pill"
+          >
             <svg
               width="14"
               height="14"
@@ -153,6 +168,22 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editorRef, onTabDr
               <line x1="17" y1="16" x2="23" y2="16" />
             </svg>
             Headers & Variables
+            {tabDrawerErrors && tabDrawerErrors.length > 0 && (
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={theme.colors.accent.danger}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            )}
           </ToolbarButton>
         )}
       </div>

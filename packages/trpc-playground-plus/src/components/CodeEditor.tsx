@@ -26,6 +26,7 @@ interface CodeEditorProps {
   onPlayRequest?: (code: string) => Promise<void>;
   variables?: Variable[];
   onTabDrawerClick?: () => void;
+  tabDrawerErrors?: string[];
   fontSize?: number;
 }
 
@@ -244,6 +245,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onPlayRequest,
   variables = [],
   onTabDrawerClick,
+  tabDrawerErrors,
   fontSize = 15,
 }) => {
   const theme = useTheme();
@@ -958,7 +960,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} onTabDrawerClick={onTabDrawerClick} onFormat={handleFormat} />
+      <EditorToolbar
+        editorRef={editorRef}
+        onTabDrawerClick={onTabDrawerClick}
+        tabDrawerErrors={tabDrawerErrors}
+        onFormat={handleFormat}
+      />
       <CodeMirror
         ref={editorRef}
         value={value}

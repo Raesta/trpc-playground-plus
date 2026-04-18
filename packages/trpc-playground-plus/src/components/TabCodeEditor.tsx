@@ -20,6 +20,7 @@ interface TabCodeEditorProps {
   onSplitChange: (pct: number) => void;
   mergedVariables?: Variable[];
   onTabDrawerClick?: () => void;
+  tabDrawerErrors?: string[];
   fontSize?: number;
 }
 
@@ -38,6 +39,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   onSplitChange,
   mergedVariables,
   onTabDrawerClick,
+  tabDrawerErrors,
   fontSize,
 }) => {
   const theme = useTheme();
@@ -253,6 +255,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               onPlayRequest={onPlayRequest}
               variables={mergedVariables}
               onTabDrawerClick={onTabDrawerClick}
+              tabDrawerErrors={tabDrawerErrors}
               fontSize={fontSize}
             />
           )}

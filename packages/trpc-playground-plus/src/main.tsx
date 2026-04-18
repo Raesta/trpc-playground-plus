@@ -8,6 +8,7 @@ import { loadSettings, saveSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { getTheme } from './theme';
 import { type Header, Scope, type Tab, type Variable, type VariableType } from './types';
+import { getDrawerErrors } from './utils/drawer-errors';
 import { getStorageKey } from './utils/storage-keys';
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client';
 import { validateVariableValue } from './utils/variable-validation';
@@ -184,11 +185,17 @@ const Playground = () => {
     setRequestTimeout(s.requestTimeout);
   }, [config]);
 
+  const activeTab = tabs.find((tab) => tab.isActive);
+  const globalErrors = useMemo(() => getDrawerErrors(globalVariables, globalHeaders), [globalVariables, globalHeaders]);
+  const tabErrors = useMemo(
+    () => (activeTab ? getDrawerErrors(activeTab.variables, activeTab.headers) : []),
+    [activeTab],
+  );
+
   if (!config) {
     return <div>Loading playground...</div>;
   }
 
-  const activeTab = tabs.find((tab) => tab.isActive);
   const mergedVariables = mergeByKey(globalVariables, activeTab?.variables ?? []);
   const mergedHeaders = mergeByKey(globalHeaders, activeTab?.headers ?? []);
 
@@ -433,6 +440,9 @@ const Playground = () => {
             </button>
             <button
               onClick={() => setGlobalDrawerOpen(!globalDrawerOpen)}
+              title={
+                globalErrors.length > 0 ? `${globalErrors.length} error(s):\n${globalErrors.join('\n')}` : undefined
+              }
               style={btnStyle}
               onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
               onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.primary)}
@@ -452,6 +462,22 @@ const Playground = () => {
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
               </svg>
               Global
+              {globalErrors.length > 0 && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={theme.colors.accent.danger}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              )}
             </button>
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}
@@ -489,6 +515,7 @@ const Playground = () => {
             onSplitChange={handleSplitChange}
             mergedVariables={mergedVariables}
             onTabDrawerClick={() => setTabDrawerOpen(!tabDrawerOpen)}
+            tabDrawerErrors={tabErrors}
             fontSize={fontSize}
           />
         </div>
