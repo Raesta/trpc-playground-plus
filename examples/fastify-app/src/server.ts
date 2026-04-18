@@ -82,6 +82,16 @@ const appRouter = t.router({
     .output(z.object({}))
     .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
 
+  setStatus: t.procedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.enum(['pending', 'active', 'archived']),
+      }),
+    )
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(() => ({ ok: true })),
+
   user: userRouter,
   post: postRouter,
 });

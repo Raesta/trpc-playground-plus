@@ -398,20 +398,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     [schema, variables, createTrpcLinter],
   );
 
+  const formatSchemaType = (s: any): string => {
+    if (!s) return 'unknown';
+    if (s.const !== undefined) return JSON.stringify(s.const);
+    if (Array.isArray(s.enum)) return s.enum.map((v: any) => JSON.stringify(v)).join(' | ');
+    if (Array.isArray(s.anyOf)) return s.anyOf.map(formatSchemaType).join(' | ');
+    if (s.type === 'array' && s.items) return `${formatSchemaType(s.items)}[]`;
+    return s.type || 'unknown';
+  };
+
   const formatSchemaForInfo = (schema: any): string => {
     if (!schema) return '';
     try {
       if (schema.type === 'object' && schema.properties) {
         const props = Object.entries(schema.properties)
           .map(([key, prop]: [string, any]) => {
-            const type = prop.type || 'unknown';
+            const type = formatSchemaType(prop);
             const required = schema.required?.includes(key) ? '' : '?';
             return `${key}${required}: ${type}`;
           })
           .join(', ');
         return `{ ${props} }`;
-      } else if (schema.type) {
-        return schema.type;
+      } else if (schema.type || schema.enum || schema.const !== undefined || schema.anyOf) {
+        return formatSchemaType(schema);
       }
     } catch (error) {
       console.warn('Error formatting schema:', error);
@@ -620,6 +629,33 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             const fullAfterProcedure = fullText.substring(procedureStart);
             const hasOpenBrace = fullAfterProcedure.includes('{');
 
+            // Check if cursor is right after "propertyName: " (enum/const value slot)
+            const beforeCursor = text.substring(procedureStart);
+            const valueSlotMatch = beforeCursor.match(/(\w+)\s*:\s*(["']?)(\w*)$/);
+            if (valueSlotMatch) {
+              const propName = valueSlotMatch[1];
+              const quote = valueSlotMatch[2];
+              const partial = valueSlotMatch[3];
+              const propSchema = (inputSchema.properties as any)[propName];
+              if (propSchema) {
+                const values: any[] = [];
+                if (propSchema.const !== undefined) values.push(propSchema.const);
+                if (Array.isArray(propSchema.enum)) values.push(...propSchema.enum);
+                if (values.length > 0) {
+                  const from = context.pos - partial.length - quote.length;
+                  return {
+                    from,
+                    options: values.map((v) => ({
+                      label: JSON.stringify(v),
+                      type: 'constant',
+                      boost: 100,
+                      apply: JSON.stringify(v),
+                    })),
+                  };
+                }
+              }
+            }
+
             const from = word ? word.from : context.pos;
 
             if (!hasOpenBrace) {
@@ -683,14 +719,18 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 .filter(([key]) => !usedKeys.has(key))
                 .map(([key, propSchema]: [string, any]) => {
                   const isRequired = required.includes(key);
-                  const type = propSchema.type || 'unknown';
+                  const type = formatSchemaType(propSchema);
+                  const rawType = propSchema.type;
 
                   let apply = key;
-                  if (type === 'object') apply = `${key}: {}`;
-                  else if (type === 'array') apply = `${key}: []`;
-                  else if (type === 'string') apply = `${key}: ""`;
-                  else if (type === 'number' || type === 'integer') apply = `${key}: 0`;
-                  else if (type === 'boolean') apply = `${key}: false`;
+                  if (propSchema.const !== undefined) apply = `${key}: ${JSON.stringify(propSchema.const)}`;
+                  else if (Array.isArray(propSchema.enum) && propSchema.enum.length > 0)
+                    apply = `${key}: ${JSON.stringify(propSchema.enum[0])}`;
+                  else if (rawType === 'object') apply = `${key}: {}`;
+                  else if (rawType === 'array') apply = `${key}: []`;
+                  else if (rawType === 'string') apply = `${key}: ""`;
+                  else if (rawType === 'number' || rawType === 'integer') apply = `${key}: 0`;
+                  else if (rawType === 'boolean') apply = `${key}: false`;
                   else apply = `${key}: `;
 
                   if (needsComma) {

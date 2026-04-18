@@ -219,6 +219,29 @@ function validateWithJsonSchema(
               received: Array.isArray(propValue) ? 'array' : typeof propValue,
             });
           }
+
+          // Enum / const checks on static values (skip JS expressions)
+          if (!isJsExpr) {
+            if (Array.isArray(propSchema.enum) && !propSchema.enum.includes(propValue)) {
+              const allowed = propSchema.enum.map((v: any) => JSON.stringify(v)).join(' | ');
+              errors.push({
+                code: 'invalid_enum_value',
+                message: `Expected one of ${allowed}, received ${JSON.stringify(propValue)}`,
+                path: [propName],
+                expected: allowed,
+                received: JSON.stringify(propValue),
+              });
+            }
+            if (propSchema.const !== undefined && propValue !== propSchema.const) {
+              errors.push({
+                code: 'invalid_literal',
+                message: `Expected ${JSON.stringify(propSchema.const)}, received ${JSON.stringify(propValue)}`,
+                path: [propName],
+                expected: JSON.stringify(propSchema.const),
+                received: JSON.stringify(propValue),
+              });
+            }
+          }
         }
       }
     }
