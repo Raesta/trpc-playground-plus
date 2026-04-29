@@ -7,9 +7,10 @@ import {
 import { javascript } from '@codemirror/lang-javascript';
 import { foldGutter } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
-import { EditorView, GutterMarker, gutter, type ViewUpdate } from '@codemirror/view';
+import { StateEffect, StateField } from '@codemirror/state';
+import { Decoration, type DecorationSet, EditorView, GutterMarker, gutter, type ViewUpdate } from '@codemirror/view';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
 import { useTheme } from '../ThemeContext';
 import type { ThemeConfig } from '../theme';
@@ -23,12 +24,25 @@ interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
   schema: RouterSchema;
-  onPlayRequest?: (code: string) => Promise<void>;
+  onPlayRequest?: (code: string, range?: { from: number; to: number }) => Promise<void>;
+  executingRange?: { from: number; to: number } | null;
   variables?: Variable[];
   onTabDrawerClick?: () => void;
   tabDrawerErrors?: string[];
   fontSize?: number;
 }
+
+const setExecutingRangeEffect = StateEffect.define<{ from: number; to: number } | null>();
+
+const executingRangeField = StateField.define<{ from: number; to: number } | null>({
+  create: () => null,
+  update: (val, tr) => {
+    for (const e of tr.effects) {
+      if (e.is(setExecutingRangeEffect)) return e.value;
+    }
+    return val;
+  },
+});
 
 // --- DOM helper functions (accept theme as parameter) ---
 
@@ -243,6 +257,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onChange,
   schema,
   onPlayRequest,
+  executingRange,
   variables = [],
   onTabDrawerClick,
   tabDrawerErrors,
@@ -250,6 +265,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+
+  useEffect(() => {
+    const view = editorRef.current?.view;
+    if (!view) return;
+    view.dispatch({ effects: setExecutingRangeEffect.of(executingRange ?? null) });
+  }, [executingRange]);
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
@@ -881,10 +902,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     return calls;
   };
 
-  let cachedText = '';
-  let cachedCallLines = new Map<number, string>();
+  interface CallLineData {
+    code: string;
+    from: number;
+    to: number;
+  }
 
-  function getCallLines(text: string, doc: any): Map<number, string> {
+  let cachedText = '';
+  let cachedCallLines = new Map<number, CallLineData>();
+
+  function getCallLines(text: string, doc: any): Map<number, CallLineData> {
     if (text === cachedText) return cachedCallLines;
     cachedText = text;
     cachedCallLines = new Map();
@@ -892,7 +919,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     for (const call of calls) {
       const line = doc.lineAt(call.start);
       if (!cachedCallLines.has(line.from)) {
-        cachedCallLines.set(line.from, call.code);
+        cachedCallLines.set(line.from, { code: call.code, from: call.start, to: call.end });
       }
     }
     return cachedCallLines;
@@ -910,8 +937,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   }
 
   class PlayButtonMarker extends GutterMarker {
-    constructor(private callCode: string) {
+    constructor(private callData: CallLineData) {
       super();
+    }
+    eq(other: GutterMarker) {
+      return other instanceof PlayButtonMarker && other.callData.code === this.callData.code;
     }
     toDOM() {
       const btn = document.createElement('button');
@@ -923,11 +953,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         justify-content:center; line-height:1;
       `;
       btn.title = 'Execute this call';
-      const code = this.callCode;
+      const data = this.callData;
       btn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (onPlayRequest) onPlayRequest(code);
+        if (onPlayRequest) onPlayRequest(data.code, { from: data.from, to: data.to });
       };
       return btn;
     }
@@ -940,7 +970,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       const callLines = getCallLines(text, view.state.doc);
       const lineNum = view.state.doc.lineAt(line.from).number;
       if (callLines.has(line.from)) {
-        return new PlayButtonMarker(callLines.get(line.from)!);
+        const data = callLines.get(line.from)!;
+        return new PlayButtonMarker(data);
       }
       return new LineNumberMarker(String(lineNum));
     },
@@ -957,6 +988,34 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     const view = editorRef.current?.view;
     if (view) formatDocument(view);
   }, []);
+
+  const executingHighlightExtension = useMemo(
+    () =>
+      EditorView.decorations.compute([executingRangeField], (state): DecorationSet => {
+        const range = state.field(executingRangeField);
+        if (!range || range.from >= range.to) return Decoration.none;
+        const decorations = [];
+        const startLine = state.doc.lineAt(range.from);
+        const endLine = state.doc.lineAt(range.to);
+        for (let n = startLine.number; n <= endLine.number; n++) {
+          const line = state.doc.line(n);
+          decorations.push(Decoration.line({ class: 'cm-executing-line' }).range(line.from));
+        }
+        return Decoration.set(decorations);
+      }),
+    [],
+  );
+
+  const executingHighlightTheme = useMemo(
+    () =>
+      EditorView.theme({
+        '.cm-executing-line': {
+          backgroundColor: `${theme.colors.accent.spinner}22`,
+          boxShadow: `inset 3px 0 0 0 ${theme.colors.accent.spinner}`,
+        },
+      }),
+    [theme],
+  );
 
   return (
     <div style={styles.container}>
@@ -975,6 +1034,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           formatKeymap,
           javascript({ typescript: true }),
           editorTheme,
+          executingRangeField,
+          executingHighlightExtension,
+          executingHighlightTheme,
           playLineNumbersExtension,
           foldGutter(),
           trpcAutocompleteExtension,

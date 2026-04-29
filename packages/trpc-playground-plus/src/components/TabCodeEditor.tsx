@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeContext';
-import type { RouterSchema, Tab, Variable } from '../types';
+import type { CallInfo, RouterSchema, Tab, Variable } from '../types';
 import { CodeEditor } from './CodeEditor';
 import { JsonViewer } from './JsonViewer';
 import { Tabs } from './Tabs';
@@ -14,8 +14,10 @@ interface TabCodeEditorProps {
   resultValue: string;
   onResultChange: (value: string) => void;
   schema: RouterSchema;
-  onPlayRequest?: (code: string) => Promise<void>;
+  onPlayRequest?: (code: string, range?: { from: number; to: number }) => Promise<void>;
   isLoading?: boolean;
+  executingRange?: { from: number; to: number } | null;
+  callInfo?: CallInfo | null;
   splitPosition: number;
   onSplitChange: (pct: number) => void;
   mergedVariables?: Variable[];
@@ -35,6 +37,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   schema,
   onPlayRequest,
   isLoading,
+  executingRange,
+  callInfo,
   splitPosition,
   onSplitChange,
   mergedVariables,
@@ -253,6 +257,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               onChange={handleCodeChange}
               schema={schema}
               onPlayRequest={onPlayRequest}
+              executingRange={executingRange}
               variables={mergedVariables}
               onTabDrawerClick={onTabDrawerClick}
               tabDrawerErrors={tabDrawerErrors}
@@ -291,7 +296,13 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
           </div>
         </div>
         <div style={{ ...styles.panel, width: `${100 - leftPct}%` }}>
-          <JsonViewer value={resultValue} onChange={onResultChange} isLoading={isLoading} fontSize={fontSize} />
+          <JsonViewer
+            value={resultValue}
+            onChange={onResultChange}
+            isLoading={isLoading}
+            callInfo={callInfo}
+            fontSize={fontSize}
+          />
         </div>
       </div>
     </div>

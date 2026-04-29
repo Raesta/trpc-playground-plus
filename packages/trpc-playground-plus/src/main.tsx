@@ -7,7 +7,7 @@ import VarsHeadersDrawer from './components/VarsHeadersDrawer';
 import { loadSettings, saveSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { getTheme } from './theme';
-import { type Header, Scope, type Tab, type Variable, type VariableType } from './types';
+import { type CallInfo, type Header, Scope, type Tab, type Variable, type VariableType } from './types';
 import { getDrawerErrors } from './utils/drawer-errors';
 import { getStorageKey } from './utils/storage-keys';
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client';
@@ -26,6 +26,15 @@ interface PlaygroundConfig {
   endpoints: string[];
   schema: RouterSchema;
   projectKey?: string;
+}
+
+function parseCallMetadata(code: string): { procedure: string; method: 'query' | 'mutation' } | null {
+  const match = code.match(/trpc\.([\w.]+)\.(query|mutate)\(/);
+  if (!match) return null;
+  return {
+    procedure: match[1],
+    method: match[2] === 'mutate' ? 'mutation' : 'query',
+  };
 }
 
 function coerceVariableValue(raw: string, type: VariableType): any {
@@ -87,6 +96,8 @@ const Playground = () => {
     { key: '', value: '', type: 'string', enabled: true },
   ]);
   const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
+  const [executingRange, setExecutingRange] = useState<{ from: number; to: number } | null>(null);
+  const [lastCall, setLastCall] = useState<CallInfo | null>(null);
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
   const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
@@ -209,9 +220,12 @@ const Playground = () => {
     return result;
   };
 
-  const executeSpecificCode = async (specificCode: string) => {
+  const executeSpecificCode = async (specificCode: string, range?: { from: number; to: number }) => {
     setResult('');
     setIsLoading(true);
+    setExecutingRange(range ?? null);
+    const meta = parseCallMetadata(specificCode);
+    const startTime = performance.now();
     const headersObject = getHeadersObject();
     const trpcClient = createDynamicTRPCClient({
       trpcUrl: config.trpcEndpoint,
@@ -263,8 +277,24 @@ const Playground = () => {
           : await resultPromise;
 
       setResult(JSON.stringify(result, null, 2));
+      if (meta) {
+        setLastCall({
+          procedure: meta.procedure,
+          method: meta.method,
+          durationMs: Math.round(performance.now() - startTime),
+          status: 'ok',
+        });
+      }
     } catch (error) {
       setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
+      if (meta) {
+        setLastCall({
+          procedure: meta.procedure,
+          method: meta.method,
+          durationMs: Math.round(performance.now() - startTime),
+          status: 'error',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -511,6 +541,8 @@ const Playground = () => {
             schema={config.schema}
             onPlayRequest={executeSpecificCode}
             isLoading={isLoading}
+            executingRange={executingRange}
+            callInfo={lastCall}
             splitPosition={splitPosition}
             onSplitChange={handleSplitChange}
             mergedVariables={mergedVariables}

@@ -9,6 +9,7 @@ interface EditorToolbarProps {
   onTabDrawerClick?: () => void;
   tabDrawerErrors?: string[];
   onFormat?: () => void;
+  leftContent?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -83,6 +84,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onTabDrawerClick,
   tabDrawerErrors,
   onFormat,
+  leftContent,
   children,
 }) => {
   const theme = useTheme();
@@ -136,7 +138,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
   return (
     <div style={styles.toolbar}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {leftContent}
         {onTabDrawerClick && (
           <ToolbarButton
             title={

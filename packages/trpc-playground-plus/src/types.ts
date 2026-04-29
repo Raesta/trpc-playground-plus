@@ -66,6 +66,13 @@ export interface Variable {
   scope?: Scope;
 }
 
+export interface CallInfo {
+  procedure: string;
+  method: 'query' | 'mutation';
+  durationMs: number;
+  status: 'ok' | 'error';
+}
+
 export type ThemeMode = 'dark' | 'light';
 
 export interface PlaygroundSettings {
