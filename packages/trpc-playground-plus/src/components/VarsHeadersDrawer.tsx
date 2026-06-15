@@ -11,9 +11,13 @@ interface VarsHeadersDrawerProps {
   setOpen: (open: boolean) => void;
   variables: Variable[];
   setVariables: (variables: Variable[]) => void;
+  globalVariables?: Variable[];
+  setGlobalVariables?: (variables: Variable[]) => void;
   envVariables?: Variable[];
   headers: Header[];
   setHeaders: (headers: Header[]) => void;
+  globalHeaders?: Header[];
+  setGlobalHeaders?: (headers: Header[]) => void;
   side: 'left' | 'right';
   extraActions?: React.ReactNode;
 }
@@ -41,21 +45,36 @@ const isInvalidName = (key: string): string | null => {
   return null;
 };
 
+type VariableField = 'key' | 'value' | 'enabled' | 'type';
+type HeaderField = 'key' | 'value' | 'enabled';
+
 const VarsHeadersDrawer = ({
   title,
   open,
   setOpen,
   variables,
   setVariables,
+  globalVariables,
+  setGlobalVariables,
   envVariables,
   headers,
   setHeaders,
+  globalHeaders,
+  setGlobalHeaders,
   side,
   extraActions,
 }: VarsHeadersDrawerProps) => {
   const theme = useTheme();
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    headersLocal: true,
+    headersGlobal: false,
+    varsLocal: true,
+    varsGlobal: false,
+    varsEnv: false,
+  });
+  const toggleSection = (key: keyof typeof openSections) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const TYPE_COLORS: Record<VariableType, string> = useMemo(
     () => ({
@@ -73,13 +92,14 @@ const VarsHeadersDrawer = ({
   const addBtnStyle: React.CSSProperties = useMemo(
     () => ({
       backgroundColor: theme.colors.bg.hover,
-      color: theme.colors.text.primary,
-      border: `1px solid ${theme.colors.border.primary}`,
-      padding: '8px 16px',
-      borderRadius: theme.radius.md,
-      marginTop: '10px',
+      color: theme.colors.text.secondary,
+      border: `1px dashed ${theme.colors.border.primary}`,
+      padding: '5px 12px',
+      borderRadius: theme.radius.sm,
+      marginTop: '6px',
       cursor: 'pointer',
       width: '100%',
+      fontSize: theme.font.size.xs,
       transition: `background-color ${theme.transition.normal}`,
     }),
     [theme],
@@ -88,14 +108,15 @@ const VarsHeadersDrawer = ({
   const removeBtnStyle: React.CSSProperties = useMemo(
     () => ({
       marginLeft: 'auto',
-      backgroundColor: theme.colors.bg.hover,
-      color: theme.colors.text.primary,
-      border: `1px solid ${theme.colors.border.primary}`,
+      backgroundColor: 'transparent',
+      color: theme.colors.text.muted,
+      border: `1px solid transparent`,
       borderRadius: theme.radius.sm,
       cursor: 'pointer',
-      width: '30px',
-      height: '30px',
+      width: '24px',
+      height: '26px',
       flexShrink: 0,
+      fontSize: theme.font.size.md,
       transition: `background-color ${theme.transition.fast}`,
     }),
     [theme],
@@ -129,44 +150,285 @@ const VarsHeadersDrawer = ({
     }, 250);
   };
 
-  // Variables handlers
-  const addVariable = () => {
-    setVariables([...variables, { key: '', value: '', type: 'string', enabled: true }]);
+  // --- Generic mutation helpers ---
+  const makeVarUpdater = (list: Variable[], setList: (vars: Variable[]) => void) => ({
+    add: () => setList([...list, { key: '', value: '', type: 'string', enabled: true }]),
+    update: (index: number, field: VariableField, newValue: string | boolean) => {
+      const next = [...list];
+      if (field === 'key' || field === 'value') {
+        next[index][field] = newValue as string;
+      } else if (field === 'enabled') {
+        next[index][field] = newValue as boolean;
+      } else if (field === 'type') {
+        next[index].type = newValue as VariableType;
+      }
+      setList(next);
+    },
+    remove: (index: number) => setList(list.filter((_, i) => i !== index)),
+  });
+
+  const makeHeaderUpdater = (list: Header[], setList: (h: Header[]) => void) => ({
+    add: () => setList([...list, { key: '', value: '', enabled: true }]),
+    update: (index: number, field: HeaderField, newValue: string | boolean) => {
+      const next = [...list];
+      if (field === 'key' || field === 'value') {
+        next[index][field] = newValue as string;
+      } else if (field === 'enabled') {
+        next[index][field] = newValue as boolean;
+      }
+      setList(next);
+    },
+    remove: (index: number) => setList(list.filter((_, i) => i !== index)),
+  });
+
+  const tabVars = makeVarUpdater(variables, setVariables);
+  const tabHeaders = makeHeaderUpdater(headers, setHeaders);
+  const globalVars = setGlobalVariables ? makeVarUpdater(globalVariables ?? [], setGlobalVariables) : null;
+  const globalHdrs = setGlobalHeaders ? makeHeaderUpdater(globalHeaders ?? [], setGlobalHeaders) : null;
+
+  // --- Override detection ---
+  const enabledTabVarKeys = new Set(variables.filter((v) => v.enabled && v.key.trim()).map((v) => v.key.trim()));
+  const enabledTabHeaderKeys = new Set(headers.filter((h) => h.enabled && h.key.trim()).map((h) => h.key.trim()));
+  const envKeys = new Set((envVariables ?? []).map((e) => e.key.trim()).filter(Boolean));
+
+  const scopeSuffix = (text: string, color: string) => (
+    <span
+      style={{
+        color,
+        fontWeight: 400,
+        textTransform: 'none',
+        letterSpacing: 'normal',
+        fontSize: theme.font.size.xs,
+      }}
+    >
+      {text}
+    </span>
+  );
+
+  const renderSectionHeader = (
+    label: string,
+    count: number,
+    isOpen: boolean,
+    onToggle: () => void,
+    suffix?: React.ReactNode,
+  ) => (
+    <button
+      onClick={onToggle}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        width: '100%',
+        background: 'none',
+        border: 'none',
+        padding: '6px 4px',
+        margin: '8px 0 4px',
+        cursor: 'pointer',
+        color: theme.colors.text.muted,
+        fontSize: theme.font.size.xs,
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        borderRadius: theme.radius.sm,
+      }}
+      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+    >
+      <span style={{ fontSize: '10px', width: '10px' }}>{isOpen ? '▾' : '▸'}</span>
+      <span>{label}</span>
+      <span style={{ opacity: 0.6, fontWeight: 400, textTransform: 'none', letterSpacing: 'normal' }}>({count})</span>
+      {suffix}
+    </button>
+  );
+
+  const renderErrorIcon = (message: string) => (
+    <span
+      title={message}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '20px',
+        flexShrink: 0,
+        color: theme.colors.accent.danger,
+        fontSize: theme.font.size.sm,
+        cursor: 'help',
+      }}
+    >
+      ⚠
+    </span>
+  );
+
+  const renderVariableRow = (
+    variable: Variable,
+    index: number,
+    api: ReturnType<typeof makeVarUpdater>,
+    keyPrefix: string,
+    overriddenBy?: 'tab' | 'env' | null,
+  ) => {
+    const nameError = isInvalidName(variable.key);
+    const valueError =
+      variable.type !== 'null' ? validateVariableValue(variable.value, variable.type || 'string') : null;
+    const isJsonType = ['object', 'array', 'json'].includes(variable.type || 'string');
+    const isNull = variable.type === 'null';
+    const opacity = overriddenBy ? 0.5 : 1;
+    const errorMsg = [nameError, valueError].filter(Boolean).join(' · ');
+    return (
+      <div key={`${keyPrefix}-${index}`} style={{ marginBottom: '4px', opacity }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: isJsonType ? 'flex-start' : 'center' }}>
+          <Checkbox
+            id={`${side}-${keyPrefix}-variable-enabled-${index}`}
+            checked={variable.enabled}
+            onChange={() => api.update(index, 'enabled', !variable.enabled)}
+          />
+          <select
+            value={variable.type || 'string'}
+            onChange={(e) => api.update(index, 'type', e.target.value)}
+            style={{
+              backgroundColor: theme.colors.bg.hover,
+              color: TYPE_COLORS[variable.type || 'string'],
+              border: `1px solid ${TYPE_COLORS[variable.type || 'string']}`,
+              borderRadius: theme.radius.sm,
+              padding: '0 3px',
+              height: '26px',
+              fontSize: theme.font.size.xs,
+              cursor: 'pointer',
+              flexShrink: 0,
+              width: '65px',
+            }}
+          >
+            {TYPE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {TYPE_LABELS[opt]}
+              </option>
+            ))}
+          </select>
+          <Input value={variable.key} onChange={(value) => api.update(index, 'key', value)} placeholder="Name" />
+          {isJsonType ? (
+            <textarea
+              value={variable.value}
+              onChange={(e) => api.update(index, 'value', e.target.value)}
+              placeholder="Value"
+              style={{
+                flex: 1,
+                boxSizing: 'border-box',
+                backgroundColor: theme.colors.bg.root,
+                color: theme.colors.text.primary,
+                border: `1px solid ${valueError ? theme.colors.accent.danger : theme.colors.border.primary}`,
+                padding: '4px 6px',
+                minHeight: '48px',
+                borderRadius: theme.radius.sm,
+                fontSize: theme.font.size.sm,
+                fontFamily: theme.font.mono,
+                outline: 'none',
+                resize: 'vertical',
+                transition: `border-color ${theme.transition.fast}`,
+              }}
+              onFocus={(e) => {
+                if (!valueError) {
+                  e.currentTarget.style.borderColor = theme.colors.accent.primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.border.focus}`;
+                }
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = valueError
+                  ? theme.colors.accent.danger
+                  : theme.colors.border.primary;
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+          ) : (
+            <Input
+              value={isNull ? '' : variable.value}
+              onChange={(value) => api.update(index, 'value', value)}
+              placeholder="Value"
+              disabled={isNull}
+              error={!!valueError}
+            />
+          )}
+          {errorMsg && renderErrorIcon(errorMsg)}
+          <button
+            onClick={() => api.remove(index)}
+            style={removeBtnStyle}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.accent.danger;
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.text.muted;
+            }}
+          >
+            ×
+          </button>
+        </div>
+        {overriddenBy && (
+          <div
+            style={{
+              color: theme.colors.text.muted,
+              fontSize: theme.font.size.xs,
+              fontStyle: 'italic',
+              marginLeft: '26px',
+              marginTop: '2px',
+            }}
+          >
+            ⊘ Overridden by {overriddenBy} variable
+          </div>
+        )}
+      </div>
+    );
   };
 
-  const updateVariable = (index: number, field: 'key' | 'value' | 'enabled' | 'type', newValue: string | boolean) => {
-    const newVariables = [...variables];
-    if (field === 'key' || field === 'value') {
-      newVariables[index][field] = newValue as string;
-    } else if (field === 'enabled') {
-      newVariables[index][field] = newValue as boolean;
-    } else if (field === 'type') {
-      newVariables[index].type = newValue as VariableType;
-    }
-    setVariables(newVariables);
-  };
-
-  const removeVariable = (index: number) => {
-    setVariables(variables.filter((_, i) => i !== index));
-  };
-
-  // Headers handlers
-  const addHeader = () => {
-    setHeaders([...headers, { key: '', value: '', enabled: true }]);
-  };
-
-  const updateHeader = (index: number, field: 'key' | 'value' | 'enabled', newValue: string | boolean) => {
-    const newHeaders = [...headers];
-    if (field === 'key' || field === 'value') {
-      newHeaders[index][field] = newValue as string;
-    } else if (field === 'enabled') {
-      newHeaders[index][field] = newValue as boolean;
-    }
-    setHeaders(newHeaders);
-  };
-
-  const removeHeader = (index: number) => {
-    setHeaders(headers.filter((_, i) => i !== index));
+  const renderHeaderRow = (
+    header: Header,
+    index: number,
+    api: ReturnType<typeof makeHeaderUpdater>,
+    keyPrefix: string,
+    overriddenBy?: 'tab' | null,
+  ) => {
+    const missingKey = header.enabled && !header.key.trim() && header.value.trim();
+    const opacity = overriddenBy ? 0.5 : 1;
+    return (
+      <div key={`${keyPrefix}-${index}`} style={{ marginBottom: '4px', opacity }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <Checkbox
+            id={`${side}-${keyPrefix}-header-enabled-${index}`}
+            checked={header.enabled}
+            onChange={() => api.update(index, 'enabled', !header.enabled)}
+          />
+          <Input value={header.key} onChange={(value) => api.update(index, 'key', value)} placeholder="Key" />
+          <Input value={header.value} onChange={(value) => api.update(index, 'value', value)} placeholder="Value" />
+          {missingKey && renderErrorIcon('Missing key')}
+          <button
+            onClick={() => api.remove(index)}
+            style={removeBtnStyle}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.accent.danger;
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.text.muted;
+            }}
+          >
+            ×
+          </button>
+        </div>
+        {overriddenBy && (
+          <div
+            style={{
+              color: theme.colors.text.muted,
+              fontSize: theme.font.size.xs,
+              fontStyle: 'italic',
+              marginLeft: '26px',
+              marginTop: '2px',
+            }}
+          >
+            ⊘ Overridden by {overriddenBy} header
+          </div>
+        )}
+      </div>
+    );
   };
 
   const isLeft = side === 'left';
@@ -233,65 +495,70 @@ const VarsHeadersDrawer = ({
               </div>
             </div>
 
-            {/* Headers Section */}
+            {/* HEADERS */}
             <h4 style={sectionTitleStyle}>Headers</h4>
 
-            {headers.map((header, index) => (
-              <div key={`${index}`} style={{ display: 'flex', marginBottom: '8px', gap: '5px' }}>
-                <Checkbox
-                  id={`${side}-header-enabled-${index}`}
-                  checked={header.enabled}
-                  onChange={() => updateHeader(index, 'enabled', !header.enabled)}
-                />
-                <Input value={header.key} onChange={(value) => updateHeader(index, 'key', value)} placeholder="Key" />
-                <Input
-                  value={header.value}
-                  onChange={(value) => updateHeader(index, 'value', value)}
-                  placeholder="Value"
-                />
+            {renderSectionHeader(
+              'Local',
+              headers.filter((h) => h.key.trim()).length,
+              openSections.headersLocal,
+              () => toggleSection('headersLocal'),
+              scopeSuffix('per tab', theme.colors.accent.mutation),
+            )}
+            {openSections.headersLocal && (
+              <div>
+                {headers.map((h, i) => renderHeaderRow(h, i, tabHeaders, 'tab'))}
                 <button
-                  onClick={() => removeHeader(index)}
-                  style={{
-                    backgroundColor: theme.colors.bg.hover,
-                    color: theme.colors.text.primary,
-                    border: `1px solid ${theme.colors.border.primary}`,
-                    borderRadius: theme.radius.sm,
-                    cursor: 'pointer',
-                    width: '30px',
-                    transition: `background-color ${theme.transition.fast}`,
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.accent.danger)}
+                  onClick={tabHeaders.add}
+                  style={addBtnStyle}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
                   onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
                 >
-                  ×
+                  + Add local header
                 </button>
               </div>
-            ))}
+            )}
 
-            <button
-              onClick={addHeader}
-              style={addBtnStyle}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
-            >
-              + Add header
-            </button>
+            {globalHdrs &&
+              renderSectionHeader(
+                'Global',
+                (globalHeaders ?? []).filter((h) => h.key.trim()).length,
+                openSections.headersGlobal,
+                () => toggleSection('headersGlobal'),
+                scopeSuffix('shared', theme.colors.accent.query),
+              )}
+            {globalHdrs && openSections.headersGlobal && (
+              <div>
+                {(globalHeaders ?? []).map((h, i) => {
+                  const overriddenBy = enabledTabHeaderKeys.has(h.key.trim()) ? 'tab' : null;
+                  return renderHeaderRow(h, i, globalHdrs, 'global', overriddenBy);
+                })}
+                <button
+                  onClick={globalHdrs.add}
+                  style={addBtnStyle}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+                >
+                  + Add global header
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div
               style={{
                 borderTop: `1px solid ${theme.colors.border.primary}`,
-                margin: '16px 0',
+                margin: '14px 0',
               }}
             />
 
-            {/* Variables Section */}
+            {/* VARIABLES */}
             <h4 style={sectionTitleStyle}>Variables</h4>
             <p
               style={{
                 color: theme.colors.text.muted,
                 fontSize: theme.font.size.xs,
-                margin: '0 0 12px',
+                margin: '0 0 8px',
                 lineHeight: 1.5,
               }}
             >
@@ -301,179 +568,84 @@ const VarsHeadersDrawer = ({
                 style={{
                   color: theme.colors.text.primary,
                   backgroundColor: theme.colors.bg.code,
-                  padding: '2px 6px',
+                  padding: '1px 5px',
                   borderRadius: theme.radius.sm,
                   fontFamily: theme.font.mono,
+                  fontSize: theme.font.size.xs,
                 }}
               >
                 trpc.user.query(myVar)
               </code>
             </p>
 
-            {variables.map((variable, index) => {
-              const nameError = isInvalidName(variable.key);
-              const valueError =
-                variable.type !== 'null' ? validateVariableValue(variable.value, variable.type || 'string') : null;
-              const isJsonType = ['object', 'array', 'json'].includes(variable.type || 'string');
-              const isNull = variable.type === 'null';
-              return (
-                <div key={index} style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', gap: '5px', alignItems: isJsonType ? 'flex-start' : 'center' }}>
-                    <Checkbox
-                      id={`${side}-variable-enabled-${index}`}
-                      checked={variable.enabled}
-                      onChange={() => updateVariable(index, 'enabled', !variable.enabled)}
-                    />
-                    <select
-                      value={variable.type || 'string'}
-                      onChange={(e) => updateVariable(index, 'type', e.target.value)}
-                      style={{
-                        backgroundColor: theme.colors.bg.hover,
-                        color: TYPE_COLORS[variable.type || 'string'],
-                        border: `1px solid ${TYPE_COLORS[variable.type || 'string']}`,
-                        borderRadius: theme.radius.sm,
-                        padding: '0 4px',
-                        height: '30px',
-                        fontSize: theme.font.size.xs,
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        width: '75px',
-                      }}
-                    >
-                      {TYPE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {TYPE_LABELS[opt]}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      value={variable.key}
-                      onChange={(value) => updateVariable(index, 'key', value)}
-                      placeholder="Name"
-                    />
-                    {isJsonType ? (
-                      <textarea
-                        value={variable.value}
-                        onChange={(e) => updateVariable(index, 'value', e.target.value)}
-                        placeholder="Value"
-                        style={{
-                          flex: 1,
-                          boxSizing: 'border-box',
-                          backgroundColor: theme.colors.bg.root,
-                          color: theme.colors.text.primary,
-                          border: `1px solid ${valueError ? theme.colors.accent.danger : theme.colors.border.primary}`,
-                          padding: '6px 8px',
-                          minHeight: '60px',
-                          borderRadius: theme.radius.sm,
-                          fontSize: theme.font.size.sm,
-                          fontFamily: theme.font.mono,
-                          outline: 'none',
-                          resize: 'vertical',
-                          transition: `border-color ${theme.transition.fast}`,
-                        }}
-                        onFocus={(e) => {
-                          if (!valueError) {
-                            e.currentTarget.style.borderColor = theme.colors.accent.primary;
-                            e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.border.focus}`;
-                          }
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = valueError
-                            ? theme.colors.accent.danger
-                            : theme.colors.border.primary;
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                    ) : (
-                      <Input
-                        value={isNull ? '' : variable.value}
-                        onChange={(value) => updateVariable(index, 'value', value)}
-                        placeholder="Value"
-                        disabled={isNull}
-                        error={!!valueError}
-                      />
-                    )}
-                    <button
-                      onClick={() => removeVariable(index)}
-                      style={removeBtnStyle}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.accent.danger)}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {(nameError || valueError) && (
-                    <div
-                      style={{
-                        marginTop: '2px',
-                        marginLeft: '30px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1px',
-                      }}
-                    >
-                      {nameError && (
-                        <div style={{ color: theme.colors.accent.danger, fontSize: theme.font.size.xs }}>
-                          {nameError}
-                        </div>
-                      )}
-                      {valueError && (
-                        <div style={{ color: theme.colors.accent.danger, fontSize: theme.font.size.xs }}>
-                          {valueError}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <button
-              onClick={addVariable}
-              style={addBtnStyle}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
-            >
-              + Add variable
-            </button>
-
-            {envVariables && envVariables.length > 0 && (
-              <>
-                <div
-                  style={{
-                    height: '1px',
-                    backgroundColor: theme.colors.border.primary,
-                    margin: '20px 0',
-                    opacity: 0.6,
-                  }}
-                />
-                <h4 style={sectionTitleStyle}>
-                  Environment{' '}
-                  <span
-                    style={{
-                      fontSize: theme.font.size.xs,
-                      color: theme.colors.accent.subscription,
-                      fontWeight: 'normal',
-                      marginLeft: '6px',
-                    }}
-                  >
-                    (read-only)
-                  </span>
-                </h4>
-                <p
-                  style={{
-                    color: theme.colors.text.muted,
-                    fontSize: theme.font.size.xs,
-                    margin: '0 0 12px',
-                    lineHeight: 1.5,
-                  }}
+            {renderSectionHeader(
+              'Local',
+              variables.filter((v) => v.key.trim()).length,
+              openSections.varsLocal,
+              () => toggleSection('varsLocal'),
+              scopeSuffix('per tab', theme.colors.accent.mutation),
+            )}
+            {openSections.varsLocal && (
+              <div>
+                {variables.map((v, i) => {
+                  const overriddenBy = envKeys.has(v.key.trim()) ? 'env' : null;
+                  return renderVariableRow(v, i, tabVars, 'tab', overriddenBy);
+                })}
+                <button
+                  onClick={tabVars.add}
+                  style={addBtnStyle}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
                 >
-                  Variables injected by the host application. They take precedence over global and local variables.
-                </p>
+                  + Add local variable
+                </button>
+              </div>
+            )}
+
+            {globalVars &&
+              renderSectionHeader(
+                'Global',
+                (globalVariables ?? []).filter((v) => v.key.trim()).length,
+                openSections.varsGlobal,
+                () => toggleSection('varsGlobal'),
+                scopeSuffix('shared', theme.colors.accent.query),
+              )}
+            {globalVars && openSections.varsGlobal && (
+              <div>
+                {(globalVariables ?? []).map((v, i) => {
+                  const overriddenBy = envKeys.has(v.key.trim())
+                    ? 'env'
+                    : enabledTabVarKeys.has(v.key.trim())
+                      ? 'tab'
+                      : null;
+                  return renderVariableRow(v, i, globalVars, 'global', overriddenBy);
+                })}
+                <button
+                  onClick={globalVars.add}
+                  style={addBtnStyle}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.active)}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = theme.colors.bg.hover)}
+                >
+                  + Add global variable
+                </button>
+              </div>
+            )}
+
+            {envVariables &&
+              envVariables.length > 0 &&
+              renderSectionHeader(
+                'Environment',
+                envVariables.length,
+                openSections.varsEnv,
+                () => toggleSection('varsEnv'),
+                scopeSuffix('read-only', theme.colors.accent.subscription),
+              )}
+            {envVariables && envVariables.length > 0 && openSections.varsEnv && (
+              <div>
                 {envVariables.map((variable, index) => (
                   <div
                     key={`env-${index}-${variable.key}`}
-                    style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85 }}
+                    style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.85 }}
                   >
                     <span
                       style={{
@@ -499,7 +671,7 @@ const VarsHeadersDrawer = ({
                     />
                   </div>
                 ))}
-              </>
+              </div>
             )}
           </div>
         </>
