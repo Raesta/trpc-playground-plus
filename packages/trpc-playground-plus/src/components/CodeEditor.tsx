@@ -36,11 +36,11 @@ const setExecutingRangeEffect = StateEffect.define<{ from: number; to: number } 
 
 const executingRangeField = StateField.define<{ from: number; to: number } | null>({
   create: () => null,
-  update: (val, tr) => {
-    for (const e of tr.effects) {
-      if (e.is(setExecutingRangeEffect)) return e.value;
+  update: (value, transaction) => {
+    for (const effect of transaction.effects) {
+      if (effect.is(setExecutingRangeEffect)) return effect.value;
     }
-    return val;
+    return value;
   },
 });
 
@@ -226,8 +226,13 @@ function createVariableInfoNode(
   Object.assign(nameEl.style, { fontWeight: '700', fontSize: theme.font.size.base, color: theme.colors.text.primary });
   header.appendChild(nameEl);
 
-  const scopeLabel = scope === Scope.LOCAL ? Scope.LOCAL : Scope.GLOBAL;
-  const scopeColor = scope === Scope.LOCAL ? theme.colors.accent.mutation : theme.colors.accent.query;
+  const scopeLabel = scope === Scope.ENV ? Scope.ENV : scope === Scope.LOCAL ? Scope.LOCAL : Scope.GLOBAL;
+  const scopeColor =
+    scope === Scope.ENV
+      ? theme.colors.accent.subscription
+      : scope === Scope.LOCAL
+        ? theme.colors.accent.mutation
+        : theme.colors.accent.query;
   header.appendChild(createBadge(scopeLabel, scopeColor, theme));
   header.appendChild(createBadge(type, FIXED_TYPE_COLORS[type] || theme.colors.text.muted, theme));
   container.appendChild(header);
@@ -349,6 +354,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         '.cm-completionIcon-variable-local': {
           backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.mutation}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
         },
+        '.cm-completionIcon-variable-env': {
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.accent.subscription}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'/><circle cx='12' cy='10' r='3'/></svg>`)}")`,
+        },
         '.cm-completionIcon-text': {
           backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='${theme.colors.text.secondary}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M7 7h10'/><path d='M12 7v10'/><path d='M9 17h6'/></svg>`)}")`,
         },
@@ -421,13 +429,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     [schema, variables, createTrpcLinter],
   );
 
-  const formatSchemaType = (s: any): string => {
-    if (!s) return 'unknown';
-    if (s.const !== undefined) return JSON.stringify(s.const);
-    if (Array.isArray(s.enum)) return s.enum.map((v: any) => JSON.stringify(v)).join(' | ');
-    if (Array.isArray(s.anyOf)) return s.anyOf.map(formatSchemaType).join(' | ');
-    if (s.type === 'array' && s.items) return `${formatSchemaType(s.items)}[]`;
-    return s.type || 'unknown';
+  const formatSchemaType = (schema: any): string => {
+    if (!schema) return 'unknown';
+    if (schema.const !== undefined) return JSON.stringify(schema.const);
+    if (Array.isArray(schema.enum)) return schema.enum.map((value: any) => JSON.stringify(value)).join(' | ');
+    if (Array.isArray(schema.anyOf)) return schema.anyOf.map((value: any) => formatSchemaType(value)).join(' | ');
+    if (schema.type === 'array' && schema.items) return `${formatSchemaType(schema.items)}[]`;
+    return schema.type || 'unknown';
   };
 
   const formatSchemaForInfo = (schema: any): string => {
@@ -635,7 +643,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             .filter((value) => value.key.trim() && value.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(value.key.trim()))
             .map((value) => ({
               label: value.key.trim(),
-              type: value.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
+              type:
+                value.scope === Scope.ENV
+                  ? 'variable-env'
+                  : value.scope === Scope.LOCAL
+                    ? 'variable-local'
+                    : 'variable-global',
               info: () =>
                 createVariableInfoNode(
                   value.key.trim(),
@@ -644,7 +657,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   theme,
                   value.scope,
                 ),
-              boost: value.scope === Scope.GLOBAL ? -10 : -20,
+              boost: value.scope === Scope.ENV ? 0 : value.scope === Scope.GLOBAL ? -10 : -20,
             }));
 
           if (inputSchema.type === 'object' && inputSchema.properties) {
@@ -811,7 +824,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       .filter((v) => v.key.trim() && v.enabled && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.key.trim()))
       .map((v) => ({
         label: v.key.trim(),
-        type: v.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
+        type: v.scope === Scope.ENV ? 'variable-env' : v.scope === Scope.LOCAL ? 'variable-local' : 'variable-global',
         info: () =>
           createVariableInfoNode(
             v.key.trim(),
@@ -820,7 +833,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             theme,
             v.scope,
           ),
-        boost: v.scope === Scope.GLOBAL ? -10 : -20,
+        boost: v.scope === Scope.ENV ? 0 : v.scope === Scope.GLOBAL ? -10 : -20,
       }));
 
     if (word && word.from < word.to) {

@@ -110,6 +110,11 @@ const playground = await createFastifyAdapter({
   playgroundEndpoint: '/playground',
   defaultData: trpcPlaygroundTabs,
   projectKey: 'funnel-api',
+  envVariables: {
+    API_URL: process.env.API_URL ?? 'https://api.example.com',
+    TENANT_ID: process.env.TENANT_ID ?? 'tenant-default',
+    DEBUG: process.env.DEBUG === 'true',
+  },
 });
 
 playground.listen({ port: 4000 }, () => {

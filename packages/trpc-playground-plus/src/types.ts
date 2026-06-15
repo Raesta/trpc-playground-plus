@@ -53,6 +53,7 @@ export interface Header {
 export const Scope = {
   GLOBAL: 'global',
   LOCAL: 'local',
+  ENV: 'env',
 } as const;
 export type Scope = (typeof Scope)[keyof typeof Scope];
 

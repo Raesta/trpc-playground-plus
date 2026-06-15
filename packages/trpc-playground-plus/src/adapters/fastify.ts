@@ -118,6 +118,34 @@ function stripZodSchemasForClient(schema: RouterSchema): RouterSchema {
   return stripped;
 }
 
+function toEnvVariables(envVariables?: Record<string, unknown>) {
+  if (!envVariables) return [];
+  return Object.entries(envVariables).map(([key, raw]) => {
+    let type: 'string' | 'number' | 'boolean' | 'null' | 'array' | 'object' = 'string';
+    let value: string;
+    if (raw === null || raw === undefined) {
+      type = 'null';
+      value = '';
+    } else if (typeof raw === 'string') {
+      type = 'string';
+      value = raw;
+    } else if (typeof raw === 'number') {
+      type = 'number';
+      value = String(raw);
+    } else if (typeof raw === 'boolean') {
+      type = 'boolean';
+      value = String(raw);
+    } else if (Array.isArray(raw)) {
+      type = 'array';
+      value = JSON.stringify(raw);
+    } else {
+      type = 'object';
+      value = JSON.stringify(raw);
+    }
+    return { key, value, type, enabled: true, scope: 'env' as const };
+  });
+}
+
 export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   app,
   trpcEndpoint,
@@ -126,6 +154,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   playgroundEndpoint = '/playground',
   defaultData = {},
   projectKey,
+  envVariables,
 }: {
   app: FastifyInstance;
   trpcEndpoint: string;
@@ -134,6 +163,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   playgroundEndpoint?: string;
   defaultData?: ExportData;
   projectKey?: string;
+  envVariables?: Record<string, unknown>;
 }) {
   if (!app || typeof app !== 'object') {
     throw new Error('Invalid app parameter: app must be a FastifyInstance');
@@ -179,6 +209,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
   });
 
   const routerStructure = extractRouterStructure(router);
+  const resolvedEnvVariables = toEnvVariables(envVariables);
 
   app.get(`${playgroundEndpoint}/config`, (_, reply) => {
     reply.header('Content-Type', 'application/json');
@@ -197,6 +228,7 @@ export async function createFastifyAdapter<TRouter extends AnyTRPCRouter>({
         },
       ],
       defaultHeaders: defaultData?.headers || [],
+      envVariables: resolvedEnvVariables,
     });
   });
 

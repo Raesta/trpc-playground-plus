@@ -72,6 +72,21 @@ function mergeByKey<T extends { key: string; enabled: boolean }>(globals: T[], l
   ];
 }
 
+function mergeVariablesWithEnv(
+  envs: Variable[],
+  globals: Variable[],
+  locals: Variable[],
+): (Variable & { scope: Scope })[] {
+  const envKeys = new Set(envs.filter((e) => e.key.trim()).map((e) => e.key.trim()));
+  // Env vars always win — exclude any local/global that conflicts by key
+  const filteredLocals = locals.filter((l) => !envKeys.has(l.key.trim()));
+  const filteredGlobals = globals.filter((g) => !envKeys.has(g.key.trim()));
+  return [
+    ...envs.filter((e) => e.key.trim()).map((e) => ({ ...e, scope: Scope.ENV })),
+    ...mergeByKey(filteredGlobals, filteredLocals),
+  ];
+}
+
 function ensureVariableType(value: any): Variable {
   return { ...value, type: value.type || 'string' };
 }
@@ -95,6 +110,7 @@ const Playground = () => {
   const [globalVariables, setGlobalVariables] = useState<Variable[]>([
     { key: '', value: '', type: 'string', enabled: true },
   ]);
+  const [envVariables, setEnvVariables] = useState<Variable[]>([]);
   const [tabDrawerOpen, setTabDrawerOpen] = useState(false);
   const [executingRange, setExecutingRange] = useState<{ from: number; to: number } | null>(null);
   const [lastCall, setLastCall] = useState<CallInfo | null>(null);
@@ -161,8 +177,9 @@ const Playground = () => {
     fetch('/playground/config')
       .then((res) => res.json())
       .then((data) => {
-        const { defaultTabs, defaultHeaders, ...rest } = data;
+        const { defaultTabs, defaultHeaders, envVariables: envVars, ...rest } = data;
         setConfig(rest);
+        setEnvVariables(Array.isArray(envVars) ? envVars.map(ensureVariableType) : []);
 
         const savedTabs = localStorage.getItem(getStorageKey('tabs', rest.projectKey));
         const savedHeaders = localStorage.getItem(getStorageKey('headers', rest.projectKey));
@@ -207,7 +224,7 @@ const Playground = () => {
     return <div>Loading playground...</div>;
   }
 
-  const mergedVariables = mergeByKey(globalVariables, activeTab?.variables ?? []);
+  const mergedVariables = mergeVariablesWithEnv(envVariables, globalVariables, activeTab?.variables ?? []);
   const mergedHeaders = mergeByKey(globalHeaders, activeTab?.headers ?? []);
 
   const getHeadersObject = () => {
@@ -400,6 +417,7 @@ const Playground = () => {
         setOpen={setGlobalDrawerOpen}
         variables={globalVariables}
         setVariables={handleUpdateGlobalVariables}
+        envVariables={envVariables}
         headers={globalHeaders}
         setHeaders={handleUpdateGlobalHeaders}
         side="right"

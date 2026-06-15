@@ -11,6 +11,7 @@ interface VarsHeadersDrawerProps {
   setOpen: (open: boolean) => void;
   variables: Variable[];
   setVariables: (variables: Variable[]) => void;
+  envVariables?: Variable[];
   headers: Header[];
   setHeaders: (headers: Header[]) => void;
   side: 'left' | 'right';
@@ -46,6 +47,7 @@ const VarsHeadersDrawer = ({
   setOpen,
   variables,
   setVariables,
+  envVariables,
   headers,
   setHeaders,
   side,
@@ -434,6 +436,71 @@ const VarsHeadersDrawer = ({
             >
               + Add variable
             </button>
+
+            {envVariables && envVariables.length > 0 && (
+              <>
+                <div
+                  style={{
+                    height: '1px',
+                    backgroundColor: theme.colors.border.primary,
+                    margin: '20px 0',
+                    opacity: 0.6,
+                  }}
+                />
+                <h4 style={sectionTitleStyle}>
+                  Environment{' '}
+                  <span
+                    style={{
+                      fontSize: theme.font.size.xs,
+                      color: theme.colors.accent.subscription,
+                      fontWeight: 'normal',
+                      marginLeft: '6px',
+                    }}
+                  >
+                    (read-only)
+                  </span>
+                </h4>
+                <p
+                  style={{
+                    color: theme.colors.text.muted,
+                    fontSize: theme.font.size.xs,
+                    margin: '0 0 12px',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Variables injected by the host application. They take precedence over global and local variables.
+                </p>
+                {envVariables.map((variable, index) => (
+                  <div
+                    key={`env-${index}-${variable.key}`}
+                    style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.85 }}
+                  >
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 6px',
+                        borderRadius: theme.radius.sm,
+                        fontSize: theme.font.size.xs,
+                        fontWeight: 600,
+                        color: '#fff',
+                        backgroundColor: theme.colors.accent.subscription,
+                        textTransform: 'uppercase',
+                      }}
+                      title={`${TYPE_LABELS[variable.type]} (env)`}
+                    >
+                      env
+                    </span>
+                    <Input value={variable.key} onChange={() => undefined} placeholder="Name" disabled />
+                    <Input
+                      value={variable.type === 'null' ? '' : variable.value}
+                      onChange={() => undefined}
+                      placeholder="Value"
+                      disabled
+                    />
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </>
       )}
