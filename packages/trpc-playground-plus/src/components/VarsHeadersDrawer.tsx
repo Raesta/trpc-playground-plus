@@ -122,14 +122,30 @@ const VarsHeadersDrawer = ({
     [theme],
   );
 
-  const sectionTitleStyle: React.CSSProperties = useMemo(
-    () => ({
-      color: theme.colors.text.secondary,
-      fontSize: theme.font.size.sm,
-      margin: '0 0 8px',
-      fontWeight: 600,
-    }),
-    [theme],
+  const renderSectionDivider = (label: string) => (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        margin: '20px 0 10px',
+      }}
+    >
+      <div style={{ flex: 1, height: '1px', backgroundColor: theme.colors.border.primary }} />
+      <h4
+        style={{
+          color: theme.colors.text.primary,
+          margin: 0,
+          fontSize: theme.font.size.sm,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '1.5px',
+        }}
+      >
+        {label}
+      </h4>
+      <div style={{ flex: 1, height: '1px', backgroundColor: theme.colors.border.primary }} />
+    </div>
   );
 
   useEffect(() => {
@@ -496,7 +512,7 @@ const VarsHeadersDrawer = ({
             </div>
 
             {/* HEADERS */}
-            <h4 style={sectionTitleStyle}>Headers</h4>
+            {renderSectionDivider('Headers')}
 
             {renderSectionHeader(
               'Local',
@@ -544,16 +560,8 @@ const VarsHeadersDrawer = ({
               </div>
             )}
 
-            {/* Divider */}
-            <div
-              style={{
-                borderTop: `1px solid ${theme.colors.border.primary}`,
-                margin: '14px 0',
-              }}
-            />
-
             {/* VARIABLES */}
-            <h4 style={sectionTitleStyle}>Variables</h4>
+            {renderSectionDivider('Variables')}
             <p
               style={{
                 color: theme.colors.text.muted,
