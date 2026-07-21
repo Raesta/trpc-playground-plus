@@ -296,6 +296,7 @@ const VarsHeadersDrawer = ({
             id={`${side}-${keyPrefix}-variable-enabled-${index}`}
             checked={variable.enabled}
             onChange={() => api.update(index, 'enabled', !variable.enabled)}
+            overridden={!!overriddenBy}
           />
           <select
             value={variable.type || 'string'}
@@ -411,6 +412,7 @@ const VarsHeadersDrawer = ({
             id={`${side}-${keyPrefix}-header-enabled-${index}`}
             checked={header.enabled}
             onChange={() => api.update(index, 'enabled', !header.enabled)}
+            overridden={!!overriddenBy}
           />
           <Input value={header.key} onChange={(value) => api.update(index, 'key', value)} placeholder="Key" />
           <Input value={header.value} onChange={(value) => api.update(index, 'value', value)} placeholder="Value" />

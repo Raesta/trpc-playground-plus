@@ -8,10 +8,35 @@ interface CheckboxProps {
   name?: string;
   className?: string;
   disabled?: boolean;
+  /** When true, render a non-interactive barred circle to signal the value is overridden/ignored. */
+  overridden?: boolean;
 }
 
-const Checkbox: React.FC<CheckboxProps> = ({ checked, onChange, id, name, className, disabled }) => {
+const Checkbox: React.FC<CheckboxProps> = ({ checked, onChange, id, name, className, disabled, overridden }) => {
   const theme = useTheme();
+
+  if (overridden) {
+    return (
+      <div
+        className={className}
+        title="Overridden — this value is ignored"
+        style={{
+          width: '24px',
+          height: '24px',
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '24px',
+          lineHeight: 1,
+          color: theme.colors.text.muted,
+          cursor: 'not-allowed',
+        }}
+      >
+        ⊘
+      </div>
+    );
+  }
 
   const styles: Record<string, React.CSSProperties> = {
     containerStyles: {
