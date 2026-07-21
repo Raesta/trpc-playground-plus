@@ -433,7 +433,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     if (!schema) return 'unknown';
     if (schema.const !== undefined) return JSON.stringify(schema.const);
     if (Array.isArray(schema.enum)) return schema.enum.map((value: any) => JSON.stringify(value)).join(' | ');
-    if (Array.isArray(schema.anyOf)) return schema.anyOf.map((value: any) => formatSchemaType(value)).join(' | ');
+    if (Array.isArray(schema.anyOf))
+      return schema.anyOf.map((value: any) => `| ${formatSchemaType(value)}`).join('\n');
+    if (schema.type === 'object' && schema.properties) {
+      const props = Object.entries(schema.properties)
+        .map(([key, prop]: [string, any]) => {
+          const required = schema.required?.includes(key) ? '' : '?';
+          return `${key}${required}: ${formatSchemaType(prop)}`;
+        })
+        .join(', ');
+      return `{ ${props} }`;
+    }
     if (schema.type === 'array' && schema.items) return `${formatSchemaType(schema.items)}[]`;
     return schema.type || 'unknown';
   };

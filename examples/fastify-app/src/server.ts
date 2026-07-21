@@ -92,6 +92,31 @@ const appRouter = t.router({
     .output(z.object({ ok: z.boolean() }))
     .mutation(() => ({ ok: true })),
 
+  sendNotification: t.procedure
+    .input(
+      z.discriminatedUnion('type', [
+        z.object({
+          type: z.literal('email'),
+          to: z.string().email(),
+          subject: z.string(),
+          body: z.string(),
+        }),
+        z.object({
+          type: z.literal('sms'),
+          phoneNumber: z.string(),
+          message: z.string(),
+        }),
+        z.object({
+          type: z.literal('push'),
+          deviceToken: z.string(),
+          title: z.string(),
+          badge: z.number().optional(),
+        }),
+      ]),
+    )
+    .output(z.object({ delivered: z.boolean() }))
+    .mutation(({ input }) => ({ delivered: input.type !== 'sms' })),
+
   user: userRouter,
   post: postRouter,
 });
