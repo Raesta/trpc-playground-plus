@@ -140,9 +140,7 @@ function validateWithJsonSchema(
 
       const chosen = members.find((m: any) => singleLiteral(m.properties[discriminant]) === discValue);
       if (!chosen) {
-        const allowed = members
-          .map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant])))
-          .join(' | ');
+        const allowed = members.map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant]))).join(' | ');
         return {
           success: false,
           errors: [
