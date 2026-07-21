@@ -66,6 +66,23 @@ export function resolveVariableType(value: string): string {
   }
 }
 
+/** Literal value of a schema that represents a single literal (const or single-value enum). */
+function singleLiteral(prop: any): any {
+  if (!prop) return undefined;
+  if (prop.const !== undefined) return prop.const;
+  if (Array.isArray(prop.enum) && prop.enum.length === 1) return prop.enum[0];
+  return undefined;
+}
+
+/** Discriminant key of a union: a property holding a single literal in every member. */
+function findDiscriminantKey(members: any[]): string | null {
+  const keys = members[0]?.properties ? Object.keys(members[0].properties) : [];
+  for (const key of keys) {
+    if (members.every((m) => singleLiteral(m.properties?.[key]) !== undefined)) return key;
+  }
+  return null;
+}
+
 function validateWithJsonSchema(
   data: any,
   jsonSchema: any,
@@ -73,6 +90,85 @@ function validateWithJsonSchema(
 ): { success: boolean; errors: any[] } {
   if (!jsonSchema) {
     return { success: true, errors: [] };
+  }
+
+  // Union / discriminated union: pick the right member before validating.
+  if (Array.isArray(jsonSchema.anyOf)) {
+    const members = jsonSchema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
+    if (members.length === 0) {
+      return { success: true, errors: [] };
+    }
+
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      return {
+        success: false,
+        errors: [
+          {
+            code: 'invalid_type',
+            message: `Expected object, but received ${Array.isArray(data) ? 'array' : typeof data}`,
+            path: [],
+            expected: 'object',
+            received: Array.isArray(data) ? 'array' : typeof data,
+          },
+        ],
+      };
+    }
+
+    const discriminant = findDiscriminantKey(members);
+    if (discriminant) {
+      // Missing discriminant → surface it as a required-property error.
+      if (!(discriminant in data)) {
+        return {
+          success: false,
+          errors: [
+            {
+              code: 'invalid_type',
+              message: `Required property "${discriminant}" is missing`,
+              path: [discriminant],
+              expected: 'defined',
+              received: 'undefined',
+            },
+          ],
+        };
+      }
+
+      const discValue = data[discriminant];
+      // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
+      if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) {
+        return { success: true, errors: [] };
+      }
+
+      const chosen = members.find((m: any) => singleLiteral(m.properties[discriminant]) === discValue);
+      if (!chosen) {
+        const allowed = members
+          .map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant])))
+          .join(' | ');
+        return {
+          success: false,
+          errors: [
+            {
+              code: 'invalid_enum_value',
+              message: `Expected one of ${allowed}, received ${JSON.stringify(discValue)}`,
+              path: [discriminant],
+              expected: allowed,
+              received: JSON.stringify(discValue),
+            },
+          ],
+        };
+      }
+
+      // Validate against the matched variant only.
+      return validateWithJsonSchema(data, chosen, variableTypes);
+    }
+
+    // Non-discriminated union: succeed if any member matches, else return the closest member's errors.
+    let best: { success: boolean; errors: any[] } | null = null;
+    for (const member of members) {
+      const res = validateWithJsonSchema(data, member, variableTypes);
+      if (res.success) return { success: true, errors: [] };
+      if (!best || res.errors.length < best.errors.length) best = res;
+    }
+    return best ?? { success: true, errors: [] };
   }
 
   // Check if data is a known variable — validate its type against the schema
