@@ -469,6 +469,79 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     return 'any';
   };
 
+  // Returns the literal value of a schema when it represents a single literal (const or single-value enum).
+  const singleLiteral = (prop: any): any => {
+    if (!prop) return undefined;
+    if (prop.const !== undefined) return prop.const;
+    if (Array.isArray(prop.enum) && prop.enum.length === 1) return prop.enum[0];
+    return undefined;
+  };
+
+  // Finds the discriminant key of a union: a property that holds a single literal in every member.
+  const findDiscriminantKey = (members: any[]): string | null => {
+    const keys = members[0]?.properties ? Object.keys(members[0].properties) : [];
+    for (const key of keys) {
+      if (members.every((m) => singleLiteral(m.properties?.[key]) !== undefined)) return key;
+    }
+    return null;
+  };
+
+  // Merges union object members into a single object schema: properties are unioned, differing
+  // literals on the same key collapse into an enum, and required keeps only keys required everywhere.
+  const mergeObjectSchemas = (members: any[]): any => {
+    const properties: Record<string, any> = {};
+    const requiredCounts: Record<string, number> = {};
+    for (const member of members) {
+      for (const [key, value] of Object.entries<any>(member.properties)) {
+        const existing = properties[key];
+        if (!existing) {
+          properties[key] = value;
+        } else {
+          const existingLiterals = existing.const !== undefined ? [existing.const] : existing.enum;
+          const valueLiterals = value.const !== undefined ? [value.const] : value.enum;
+          if (Array.isArray(existingLiterals) && Array.isArray(valueLiterals)) {
+            properties[key] = { enum: Array.from(new Set([...existingLiterals, ...valueLiterals])) };
+          }
+        }
+        if ((member.required || []).includes(key)) requiredCounts[key] = (requiredCounts[key] || 0) + 1;
+      }
+    }
+    const required = Object.keys(requiredCounts).filter((key) => requiredCounts[key] === members.length);
+    return { type: 'object', properties, required };
+  };
+
+  // Resolves the effective object schema to drive input-field completion. Plain objects pass through;
+  // unions (anyOf) narrow to the member matching the already-typed discriminant, else merge all members.
+  const resolveInputObjectSchema = (inputSchema: any, typedObjectContent: string): any => {
+    if (!inputSchema) return null;
+    if (inputSchema.type === 'object' && inputSchema.properties) return inputSchema;
+    if (Array.isArray(inputSchema.anyOf)) {
+      const members = inputSchema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
+      if (members.length === 0) return null;
+      const discriminant = findDiscriminantKey(members);
+      if (discriminant) {
+        // Discriminant already chosen: narrow to the matching variant so only its fields are offered.
+        if (typedObjectContent) {
+          const match = typedObjectContent.match(new RegExp(`${discriminant}\\s*:\\s*["']([^"']+)["']`));
+          if (match) {
+            const chosen = members.find((m: any) => String(singleLiteral(m.properties[discriminant])) === match[1]);
+            if (chosen) return chosen;
+          }
+        }
+        // Not chosen yet: only offer the discriminant, with every variant's literal as a value option.
+        const literals = Array.from(new Set(members.map((m: any) => singleLiteral(m.properties[discriminant]))));
+        return {
+          type: 'object',
+          properties: { [discriminant]: { enum: literals } },
+          required: [discriminant],
+        };
+      }
+      // Non-discriminated union: fall back to merging all members' properties.
+      return mergeObjectSchemas(members);
+    }
+    return null;
+  };
+
   const getCompletionsFromPath = (path: string[]): CompletionResult['options'] => {
     if (path.length === 0 || path[0] === '') {
       return Object.entries(schema).map(([key, def]) => {
@@ -670,11 +743,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               boost: value.scope === Scope.ENV ? 0 : value.scope === Scope.GLOBAL ? -10 : -20,
             }));
 
-          if (inputSchema.type === 'object' && inputSchema.properties) {
-            const fullText = context.state.doc.toString();
-            const fullAfterProcedure = fullText.substring(procedureStart);
-            const hasOpenBrace = fullAfterProcedure.includes('{');
+          const fullText = context.state.doc.toString();
+          const fullAfterProcedure = fullText.substring(procedureStart);
+          const hasOpenBrace = fullAfterProcedure.includes('{');
 
+          // Extract the already-typed argument-object content (used to narrow discriminated unions).
+          let typedObjectContent = '';
+          {
+            const objBraceStart = fullAfterProcedure.indexOf('{');
+            if (objBraceStart !== -1) {
+              let depth = 1;
+              let scanPos = objBraceStart + 1;
+              while (scanPos < fullAfterProcedure.length && depth > 0) {
+                if (fullAfterProcedure[scanPos] === '{') depth++;
+                else if (fullAfterProcedure[scanPos] === '}') depth--;
+                scanPos++;
+              }
+              typedObjectContent = fullAfterProcedure.substring(objBraceStart + 1, scanPos - 1);
+            }
+          }
+
+          const effectiveSchema = resolveInputObjectSchema(inputSchema, typedObjectContent);
+
+          if (effectiveSchema) {
             // Check if cursor is right after "propertyName: " (enum/const value slot)
             const beforeCursor = text.substring(procedureStart);
             const valueSlotMatch = beforeCursor.match(/(\w+)\s*:\s*(["']?)(\w*)$/);
@@ -682,7 +773,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               const propName = valueSlotMatch[1];
               const quote = valueSlotMatch[2];
               const partial = valueSlotMatch[3];
-              const propSchema = (inputSchema.properties as any)[propName];
+              const propSchema = (effectiveSchema.properties as any)[propName];
               if (propSchema) {
                 const values: any[] = [];
                 if (propSchema.const !== undefined) values.push(propSchema.const);
@@ -760,8 +851,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 return lastChar !== ',' && lastChar !== '{' && lastChar !== '[';
               })();
 
-              const required = inputSchema.required || [];
-              const options = Object.entries(inputSchema.properties)
+              const required = effectiveSchema.required || [];
+              const options = Object.entries(effectiveSchema.properties)
                 .filter(([key]) => !usedKeys.has(key))
                 .map(([key, propSchema]: [string, any]) => {
                   const isRequired = required.includes(key);
@@ -786,7 +877,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   return {
                     label: key,
                     type: isRequired ? 'property' : 'text',
-                    boost: 20,
+                    boost: isRequired ? 30 : 20,
                     apply,
                     info: () => createPropertyInfoNode(key, type, isRequired, theme, propSchema.description),
                   };
