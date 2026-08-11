@@ -89,6 +89,87 @@ function createCodeBlock(content: string, theme: ThemeConfig): HTMLElement {
   return pre;
 }
 
+function createInlineCode(value: string, theme: ThemeConfig): HTMLElement {
+  const code = document.createElement('code');
+  code.textContent = value;
+  Object.assign(code.style, {
+    fontFamily: theme.font.mono,
+    fontSize: theme.font.size.xs,
+    padding: '1px 6px',
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.bg.code,
+    border: `1px solid ${theme.colors.border.primary}`,
+    color: theme.colors.text.primary,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  });
+  return code;
+}
+
+function createDiagnosticNode(
+  diag: { message: string; expected?: string; received?: string; path?: string[] },
+  theme: ThemeConfig,
+): HTMLElement {
+  const container = document.createElement('div');
+  Object.assign(container.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    maxWidth: '360px',
+    lineHeight: '1.5',
+  });
+
+  const hasChips = diag.expected !== undefined || diag.received !== undefined;
+
+  // Leading title (first non-empty line of the message).
+  const [firstLine, ...restLines] = diag.message.split('\n');
+  const title = document.createElement('div');
+  title.textContent = firstLine || diag.message;
+  Object.assign(title.style, { fontWeight: '600', color: theme.colors.text.primary });
+  container.appendChild(title);
+
+  const addChipRow = (labelText: string, value: string, accent: string) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' });
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    Object.assign(label.style, {
+      fontSize: theme.font.size.xs,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      color: accent,
+      minWidth: '62px',
+    });
+    row.appendChild(label);
+    row.appendChild(createInlineCode(value, theme));
+    container.appendChild(row);
+  };
+
+  if (hasChips) {
+    if (diag.expected !== undefined) addChipRow('Expected', diag.expected, theme.colors.accent.subscription);
+    if (diag.received !== undefined) addChipRow('Received', diag.received, theme.colors.accent.danger);
+    if (diag.path && diag.path.length > 0) {
+      const at = document.createElement('div');
+      at.textContent = `at ${diag.path.join('.')}`;
+      Object.assign(at.style, { fontSize: theme.font.size.xs, color: theme.colors.text.secondary });
+      container.appendChild(at);
+    }
+  } else if (restLines.length > 0) {
+    // Keep the remaining prose (available properties, expression details, etc.).
+    const rest = document.createElement('div');
+    rest.textContent = restLines.join('\n').trim();
+    Object.assign(rest.style, {
+      fontSize: theme.font.size.sm,
+      color: theme.colors.text.secondary,
+      whiteSpace: 'pre-wrap',
+    });
+    if (rest.textContent) container.appendChild(rest);
+  }
+
+  return container;
+}
+
 function createProcedureInfoNode(
   name: string,
   type: string,
@@ -371,6 +452,51 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         '.cm-completionInfo.cm-completionInfo-left': {
           marginRight: '4px !important',
         },
+        '.cm-tooltip.cm-tooltip-lint': {
+          backgroundColor: `${theme.colors.bg.secondary} !important`,
+          border: `1px solid ${theme.colors.border.primary} !important`,
+          borderRadius: `${theme.radius.md} !important`,
+          boxShadow: `${theme.shadow.lg} !important`,
+          padding: '4px !important',
+          maxWidth: '380px',
+        },
+        '.cm-tooltip-lint .cm-diagnostic': {
+          fontFamily: `${theme.font.sans} !important`,
+          fontSize: `${theme.font.size.sm} !important`,
+          lineHeight: '1.5',
+          color: `${theme.colors.text.primary} !important`,
+          padding: '6px 10px !important',
+          margin: '0 !important',
+          borderRadius: `${theme.radius.sm} !important`,
+          borderLeft: '3px solid transparent !important',
+        },
+        '.cm-tooltip-lint .cm-diagnostic + .cm-diagnostic': {
+          marginTop: '4px !important',
+        },
+        '.cm-tooltip-lint .cm-diagnosticText': {
+          display: 'block',
+        },
+        '.cm-tooltip-lint .cm-diagnostic-error': {
+          borderLeftColor: `${theme.colors.accent.primary} !important`,
+          backgroundColor: 'transparent !important',
+        },
+        '.cm-tooltip-lint .cm-diagnostic-warning': {
+          borderLeftColor: `${theme.colors.accent.mutation} !important`,
+          backgroundColor: 'transparent !important',
+        },
+        '.cm-tooltip-lint .cm-diagnosticSource': {
+          display: 'block',
+          fontFamily: `${theme.font.sans} !important`,
+          fontSize: theme.font.size.xs,
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          color: `${theme.colors.text.muted} !important`,
+          opacity: '1',
+          marginTop: '8px',
+          paddingTop: '6px',
+          borderTop: `1px solid ${theme.colors.border.primary}`,
+        },
       }),
     [theme],
   );
@@ -406,6 +532,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             severity: 'error',
             message: error.message,
             source: 'tRPC Type Check',
+            renderMessage: () => createDiagnosticNode(error, theme),
           });
         }
 
@@ -416,13 +543,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             severity: 'warning',
             message: warning.message,
             source: 'tRPC Type Check',
+            renderMessage: () => createDiagnosticNode(warning, theme),
           });
         }
       }
 
       return diagnostics;
     });
-  }, []);
+  }, [theme]);
 
   const trpcLinterExtension = React.useMemo(
     () => createTrpcLinter(schema, variables),

@@ -5,6 +5,9 @@ export interface ValidationError {
   message: string;
   path?: string[];
   code: string;
+  /** Structured type/value info for rich diagnostic rendering. */
+  expected?: string;
+  received?: string;
   position: {
     start: number;
     end: number;
@@ -367,23 +370,27 @@ function validateWithJsonSchema(
 function formatZodError(zodError: any, call: TrpcCall): ValidationError {
   const path = zodError.path || [];
   let message = zodError.message;
+  let expected: string | undefined;
+  let received: string | undefined;
 
   // Improve error messages
   if (zodError.code === 'invalid_type') {
+    expected = zodError.expected;
     if (zodError.received === 'expression' && zodError.jsExpression) {
-      message = `Expected ${zodError.expected}, received JavaScript expression`;
-      if (path.length > 0) {
-        message += `\n\nProperty: ${path.join('.')}`;
-      }
-      message += `\nExpression: ${zodError.jsExpression}`;
-      message += '\n\n';
+      message = 'Type mismatch';
+      received = zodError.jsExpression;
     } else {
-      message = `Expected ${zodError.expected}, received ${zodError.received}`;
-      if (path.length > 0) {
-        message += `\n\nProperty: ${path.join('.')}`;
-      }
-      message += '\n\n';
+      message = 'Type mismatch';
+      received = zodError.received;
     }
+  } else if (zodError.code === 'invalid_enum_value') {
+    message = 'Invalid value';
+    expected = zodError.expected;
+    received = zodError.received;
+  } else if (zodError.code === 'invalid_literal') {
+    message = 'Invalid literal';
+    expected = zodError.expected;
+    received = zodError.received;
   } else if (zodError.code === 'too_small') {
     message = `Value is too small. Minimum is ${zodError.minimum}`;
   } else if (zodError.code === 'too_big') {
@@ -472,6 +479,8 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
     message,
     path,
     code: zodError.code || 'validation_error',
+    expected,
+    received,
     position,
   };
 }
