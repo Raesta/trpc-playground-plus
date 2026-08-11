@@ -97,7 +97,7 @@ const appRouter = t.router({
       z.discriminatedUnion('type', [
         z.object({
           type: z.literal('email'),
-          to: z.string().email(),
+          to: z.email(),
           subject: z.string(),
           body: z.string(),
         }),
