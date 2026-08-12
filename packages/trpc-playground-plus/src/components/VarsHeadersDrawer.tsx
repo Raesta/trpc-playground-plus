@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../ThemeContext';
 import type { Header, Variable, VariableType } from '../types';
 import { validateVariableValue } from '../utils/variable-validation';
+import { getStorageKey } from '../utils/storage-keys';
 import Checkbox from './ui/Checkbox';
 import Input from './ui/Input';
 
@@ -20,7 +21,34 @@ interface VarsHeadersDrawerProps {
   setGlobalHeaders?: (headers: Header[]) => void;
   side: 'left' | 'right';
   extraActions?: React.ReactNode;
+  projectKey?: string;
 }
+
+type OpenSections = {
+  headersLocal: boolean;
+  headersGlobal: boolean;
+  varsLocal: boolean;
+  varsGlobal: boolean;
+  varsEnv: boolean;
+};
+
+const DEFAULT_OPEN_SECTIONS: OpenSections = {
+  headersLocal: true,
+  headersGlobal: false,
+  varsLocal: true,
+  varsGlobal: false,
+  varsEnv: false,
+};
+
+const loadOpenSections = (projectKey?: string): OpenSections => {
+  try {
+    const raw = localStorage.getItem(getStorageKey('drawerSections', projectKey));
+    if (raw) return { ...DEFAULT_OPEN_SECTIONS, ...JSON.parse(raw) };
+  } catch {
+    /* corrupted data */
+  }
+  return { ...DEFAULT_OPEN_SECTIONS };
+};
 
 const TYPE_OPTIONS: VariableType[] = ['string', 'number', 'boolean', 'object', 'array', 'null', 'json'];
 
@@ -63,18 +91,21 @@ const VarsHeadersDrawer = ({
   setGlobalHeaders,
   side,
   extraActions,
+  projectKey,
 }: VarsHeadersDrawerProps) => {
   const theme = useTheme();
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [openSections, setOpenSections] = useState({
-    headersLocal: true,
-    headersGlobal: false,
-    varsLocal: true,
-    varsGlobal: false,
-    varsEnv: false,
-  });
-  const toggleSection = (key: keyof typeof openSections) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const [openSections, setOpenSections] = useState<OpenSections>(() => loadOpenSections(projectKey));
+  const toggleSection = (key: keyof OpenSections) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getStorageKey('drawerSections', projectKey), JSON.stringify(openSections));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [openSections, projectKey]);
 
   const TYPE_COLORS: Record<VariableType, string> = useMemo(
     () => ({

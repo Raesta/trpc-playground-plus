@@ -427,6 +427,7 @@ const Playground = () => {
           globalHeaders={globalHeaders}
           setGlobalHeaders={handleUpdateGlobalHeaders}
           side="left"
+          projectKey={config?.projectKey}
         />
       )}
       <Settings
