@@ -86,284 +86,260 @@ function findDiscriminantKey(members: any[]): string | null {
   return null;
 }
 
+/**
+ * Validation context threaded through the recursive validators.
+ * `path` accumulates the JSON path so nested errors carry a full location
+ * (e.g. `['meta', 'tag']`), which the linter uses for messages/highlighting.
+ */
+interface ValidationContext {
+  variableTypes: Map<string, string>;
+  path: string[];
+}
+
+/** Raw error shape produced by the validators, before `formatZodError` enriches it. */
+interface RawError {
+  code: string;
+  message: string;
+  path: string[];
+  expected?: string;
+  received?: string;
+  [extra: string]: any;
+}
+
+const childContext = (ctx: ValidationContext, key: string): ValidationContext => ({
+  variableTypes: ctx.variableTypes,
+  path: [...ctx.path, key],
+});
+
+const typeOf = (value: any): string => (Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value);
+
+/**
+ * Central dispatcher: routes a value to the validator matching its schema.
+ *
+ * New schema constructs (arrays with `items`, string/number constraints,
+ * records, …) should be added here as their own `validate*` branch — the
+ * recursion and path handling then apply for free at any depth.
+ */
+function validateValue(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  if (!schema) return [];
+
+  // Union / discriminated union: narrow before validating.
+  if (Array.isArray(schema.anyOf)) return validateUnion(data, schema, ctx);
+
+  // JS expression value (`{ x: someExpr() }` → `__JS_EXPR__someExpr()`).
+  if (typeof data === 'string' && data.startsWith('__JS_EXPR__')) return validateExpression(data, schema, ctx);
+
+  // Whole value is a known variable name (top-level `trpc.p.query(myVar)`).
+  if (typeof data === 'string' && ctx.variableTypes.has(data)) return validateVariableRef(data, schema, ctx);
+
+  if (schema.type === 'object') return validateObject(data, schema, ctx);
+
+  if (schema.type === 'string' || schema.type === 'number' || schema.type === 'boolean') {
+    return validateScalar(data, schema, ctx);
+  }
+
+  // Arrays and other constructs are not deep-validated yet (see ROADMAP §1);
+  // still honour standalone enum/const schemas.
+  return validateEnumConst(data, schema, ctx);
+}
+
+/** Build an `invalid_type` error at the current path. */
+function typeMismatch(expected: string, received: string, ctx: ValidationContext, message?: string): RawError {
+  return {
+    code: 'invalid_type',
+    message: message ?? `Expected ${expected}, but received ${received}`,
+    path: ctx.path,
+    expected,
+    received,
+  };
+}
+
+/** enum / const checks, independent of the value's base type. */
+function validateEnumConst(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  const errors: RawError[] = [];
+  if (Array.isArray(schema.enum) && !schema.enum.includes(data)) {
+    const allowed = schema.enum.map((v: any) => JSON.stringify(v)).join(' | ');
+    errors.push({
+      code: 'invalid_enum_value',
+      message: `Expected one of ${allowed}, received ${JSON.stringify(data)}`,
+      path: ctx.path,
+      expected: allowed,
+      received: JSON.stringify(data),
+    });
+  }
+  if (schema.const !== undefined && data !== schema.const) {
+    errors.push({
+      code: 'invalid_literal',
+      message: `Expected ${JSON.stringify(schema.const)}, received ${JSON.stringify(data)}`,
+      path: ctx.path,
+      expected: JSON.stringify(schema.const),
+      received: JSON.stringify(data),
+    });
+  }
+  return errors;
+}
+
+/** string / number / boolean primitives (+ any enum/const on them). */
+function validateScalar(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  const errors: RawError[] = [];
+  const expected = schema.type;
+  if (expected && typeof data !== expected) {
+    errors.push(typeMismatch(expected, typeOf(data), ctx));
+  }
+  errors.push(...validateEnumConst(data, schema, ctx));
+  return errors;
+}
+
+/** A value referencing a known variable by name — check its resolved type. */
+function validateVariableRef(name: string, schema: any, ctx: ValidationContext): RawError[] {
+  const varType = ctx.variableTypes.get(name)!;
+  const expected = schema.type;
+  if (expected && varType !== 'unknown' && varType !== expected) {
+    return [typeMismatch(expected, varType, ctx, `Variable "${name}" is ${varType}, but expected ${expected}`)];
+  }
+  return [];
+}
+
+/** A `__JS_EXPR__` value — resolve against a variable if possible, else accept as opaque. */
+function validateExpression(raw: string, schema: any, ctx: ValidationContext): RawError[] {
+  const expr = raw.substring('__JS_EXPR__'.length);
+  const expected = schema.type;
+  if (ctx.variableTypes.has(expr)) {
+    const varType = ctx.variableTypes.get(expr)!;
+    if (expected && varType !== 'unknown' && varType !== expected) {
+      return [typeMismatch(expected, varType, ctx, `Variable "${expr}" is ${varType}, but expected ${expected}`)];
+    }
+    return [];
+  }
+  return [
+    {
+      code: 'invalid_type',
+      message: `Expected ${expected}, but received JavaScript expression`,
+      path: ctx.path,
+      expected,
+      received: 'expression',
+      jsExpression: expr,
+    },
+  ];
+}
+
+/** Objects: unrecognized keys, required props, then recurse into each property. */
+function validateObject(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return [typeMismatch('object', typeOf(data), ctx)];
+  }
+
+  const errors: RawError[] = [];
+  const unrecognized: string[] = [];
+
+  // Unrecognized keys (only when the schema forbids extras).
+  if (schema.additionalProperties === false && schema.properties) {
+    const allowedProps = Object.keys(schema.properties);
+    for (const prop of Object.keys(data)) {
+      if (!allowedProps.includes(prop)) {
+        unrecognized.push(prop);
+        errors.push({
+          code: 'unrecognized_keys',
+          message: `Unrecognized key: "${prop}"`,
+          path: [...ctx.path, prop],
+          keys: [prop],
+          allowedKeys: allowedProps,
+          schemaProperties: schema.properties,
+        });
+      }
+    }
+  }
+
+  // Skip required checks when there are unrecognized keys (likely a typo).
+  if (unrecognized.length === 0 && Array.isArray(schema.required)) {
+    for (const requiredProp of schema.required) {
+      if (!(requiredProp in data)) {
+        errors.push({
+          code: 'invalid_type',
+          message: `Required property "${requiredProp}" is missing`,
+          path: [...ctx.path, requiredProp],
+          expected: 'defined',
+          received: 'undefined',
+        });
+      }
+    }
+  }
+
+  // Recurse into present properties.
+  if (schema.properties) {
+    for (const [propName, propSchema] of Object.entries(schema.properties as Record<string, any>)) {
+      if (propName in data) {
+        errors.push(...validateValue(data[propName], propSchema, childContext(ctx, propName)));
+      }
+    }
+  }
+
+  return errors;
+}
+
+/** Union / discriminated union: narrow to the right member, then validate it. */
+function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  const members = schema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
+  if (members.length === 0) return [];
+
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return [typeMismatch('object', typeOf(data), ctx)];
+  }
+
+  const discriminant = findDiscriminantKey(members);
+  if (discriminant) {
+    // Missing discriminant → surface it as a required-property error.
+    if (!(discriminant in data)) {
+      return [
+        {
+          code: 'invalid_type',
+          message: `Required property "${discriminant}" is missing`,
+          path: [...ctx.path, discriminant],
+          expected: 'defined',
+          received: 'undefined',
+        },
+      ];
+    }
+
+    const discValue = data[discriminant];
+    // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
+    if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) return [];
+
+    const chosen = members.find((m: any) => singleLiteral(m.properties[discriminant]) === discValue);
+    if (!chosen) {
+      const allowed = members.map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant]))).join(' | ');
+      return [
+        {
+          code: 'invalid_enum_value',
+          message: `Expected one of ${allowed}, received ${JSON.stringify(discValue)}`,
+          path: [...ctx.path, discriminant],
+          expected: allowed,
+          received: JSON.stringify(discValue),
+        },
+      ];
+    }
+
+    // Validate against the matched variant only.
+    return validateObject(data, chosen, ctx);
+  }
+
+  // Non-discriminated union: succeed if any member matches, else the closest one's errors.
+  let best: RawError[] | null = null;
+  for (const member of members) {
+    const errs = validateValue(data, member, ctx);
+    if (errs.length === 0) return [];
+    if (!best || errs.length < best.length) best = errs;
+  }
+  return best ?? [];
+}
+
+/** Public entry point — kept stable for `validateTrpcCall`. */
 function validateWithJsonSchema(
   data: any,
   jsonSchema: any,
   variableTypes: Map<string, string> = new Map(),
 ): { success: boolean; errors: any[] } {
-  if (!jsonSchema) {
-    return { success: true, errors: [] };
-  }
-
-  // Union / discriminated union: pick the right member before validating.
-  if (Array.isArray(jsonSchema.anyOf)) {
-    const members = jsonSchema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
-    if (members.length === 0) {
-      return { success: true, errors: [] };
-    }
-
-    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-      return {
-        success: false,
-        errors: [
-          {
-            code: 'invalid_type',
-            message: `Expected object, but received ${Array.isArray(data) ? 'array' : typeof data}`,
-            path: [],
-            expected: 'object',
-            received: Array.isArray(data) ? 'array' : typeof data,
-          },
-        ],
-      };
-    }
-
-    const discriminant = findDiscriminantKey(members);
-    if (discriminant) {
-      // Missing discriminant → surface it as a required-property error.
-      if (!(discriminant in data)) {
-        return {
-          success: false,
-          errors: [
-            {
-              code: 'invalid_type',
-              message: `Required property "${discriminant}" is missing`,
-              path: [discriminant],
-              expected: 'defined',
-              received: 'undefined',
-            },
-          ],
-        };
-      }
-
-      const discValue = data[discriminant];
-      // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
-      if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) {
-        return { success: true, errors: [] };
-      }
-
-      const chosen = members.find((m: any) => singleLiteral(m.properties[discriminant]) === discValue);
-      if (!chosen) {
-        const allowed = members.map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant]))).join(' | ');
-        return {
-          success: false,
-          errors: [
-            {
-              code: 'invalid_enum_value',
-              message: `Expected one of ${allowed}, received ${JSON.stringify(discValue)}`,
-              path: [discriminant],
-              expected: allowed,
-              received: JSON.stringify(discValue),
-            },
-          ],
-        };
-      }
-
-      // Validate against the matched variant only.
-      return validateWithJsonSchema(data, chosen, variableTypes);
-    }
-
-    // Non-discriminated union: succeed if any member matches, else return the closest member's errors.
-    let best: { success: boolean; errors: any[] } | null = null;
-    for (const member of members) {
-      const res = validateWithJsonSchema(data, member, variableTypes);
-      if (res.success) return { success: true, errors: [] };
-      if (!best || res.errors.length < best.errors.length) best = res;
-    }
-    return best ?? { success: true, errors: [] };
-  }
-
-  // Check if data is a known variable — validate its type against the schema
-  if (typeof data === 'string' && variableTypes.has(data)) {
-    const varType = variableTypes.get(data)!;
-    const expectedType = jsonSchema.type;
-    if (expectedType && varType !== 'unknown' && varType !== expectedType) {
-      return {
-        success: false,
-        errors: [
-          {
-            code: 'invalid_type',
-            message: `Variable "${data}" is ${varType}, but expected ${expectedType}`,
-            path: [],
-            expected: expectedType,
-            received: varType,
-          },
-        ],
-      };
-    }
-    return { success: true, errors: [] };
-  }
-
-  const errors: any[] = [];
-  const unrecognizedKeys: string[] = [];
-
-  // Validation for objects
-  if (jsonSchema.type === 'object') {
-    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
-      errors.push({
-        code: 'invalid_type',
-        message: `Expected object, but received ${Array.isArray(data) ? 'array' : typeof data}`,
-        path: [],
-        expected: 'object',
-        received: Array.isArray(data) ? 'array' : typeof data,
-      });
-      return { success: false, errors };
-    }
-
-    // First check additional properties (unrecognized keys)
-    if (jsonSchema.additionalProperties === false && jsonSchema.properties) {
-      const allowedProps = Object.keys(jsonSchema.properties);
-      for (const prop of Object.keys(data)) {
-        if (!allowedProps.includes(prop)) {
-          unrecognizedKeys.push(prop);
-          errors.push({
-            code: 'unrecognized_keys',
-            message: `Unrecognized key: "${prop}"`,
-            path: [prop],
-            keys: [prop],
-            allowedKeys: allowedProps,
-            schemaProperties: jsonSchema.properties,
-          });
-        }
-      }
-    }
-
-    // If we have unrecognized keys, don't check required properties
-    // (car c'est probablement juste une faute de frappe)
-    if (unrecognizedKeys.length === 0) {
-      // Check required properties
-      if (jsonSchema.required && Array.isArray(jsonSchema.required)) {
-        for (const requiredProp of jsonSchema.required) {
-          if (!(requiredProp in data)) {
-            errors.push({
-              code: 'invalid_type',
-              message: `Required property "${requiredProp}" is missing`,
-              path: [requiredProp],
-              expected: 'defined',
-              received: 'undefined',
-            });
-          }
-        }
-      }
-    }
-
-    // Check property types
-    if (jsonSchema.properties) {
-      for (const [propName, propSchema] of Object.entries(jsonSchema.properties as Record<string, any>)) {
-        if (propName in data) {
-          const propValue = data[propName];
-          const propType = propSchema.type;
-
-          // Check if it's a JavaScript expression
-          const isJsExpr = typeof propValue === 'string' && propValue.startsWith('__JS_EXPR__');
-
-          if (isJsExpr) {
-            const jsExpr = propValue.substring('__JS_EXPR__'.length);
-            if (variableTypes.has(jsExpr)) {
-              // Known variable — check type compatibility
-              const varType = variableTypes.get(jsExpr)!;
-              if (propType && varType !== 'unknown' && varType !== propType) {
-                errors.push({
-                  code: 'invalid_type',
-                  message: `Variable "${jsExpr}" is ${varType}, but expected ${propType}`,
-                  path: [propName],
-                  expected: propType,
-                  received: varType,
-                });
-              }
-            } else {
-              errors.push({
-                code: 'invalid_type',
-                message: `Expected ${propType}, but received JavaScript expression`,
-                path: [propName],
-                expected: propType,
-                received: 'expression',
-                jsExpression: jsExpr,
-              });
-            }
-          } else if (propType === 'string' && typeof propValue !== 'string') {
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected string, but received ${typeof propValue}`,
-              path: [propName],
-              expected: 'string',
-              received: typeof propValue,
-            });
-          } else if (propType === 'number' && typeof propValue !== 'number') {
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected number, but received ${typeof propValue}`,
-              path: [propName],
-              expected: 'number',
-              received: typeof propValue,
-            });
-          } else if (propType === 'boolean' && typeof propValue !== 'boolean') {
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected boolean, but received ${typeof propValue}`,
-              path: [propName],
-              expected: 'boolean',
-              received: typeof propValue,
-            });
-          } else if (
-            propType === 'object' &&
-            (typeof propValue !== 'object' || propValue === null || Array.isArray(propValue))
-          ) {
-            errors.push({
-              code: 'invalid_type',
-              message: `Expected object, but received ${Array.isArray(propValue) ? 'array' : typeof propValue}`,
-              path: [propName],
-              expected: 'object',
-              received: Array.isArray(propValue) ? 'array' : typeof propValue,
-            });
-          }
-
-          // Enum / const checks on static values (skip JS expressions)
-          if (!isJsExpr) {
-            if (Array.isArray(propSchema.enum) && !propSchema.enum.includes(propValue)) {
-              const allowed = propSchema.enum.map((v: any) => JSON.stringify(v)).join(' | ');
-              errors.push({
-                code: 'invalid_enum_value',
-                message: `Expected one of ${allowed}, received ${JSON.stringify(propValue)}`,
-                path: [propName],
-                expected: allowed,
-                received: JSON.stringify(propValue),
-              });
-            }
-            if (propSchema.const !== undefined && propValue !== propSchema.const) {
-              errors.push({
-                code: 'invalid_literal',
-                message: `Expected ${JSON.stringify(propSchema.const)}, received ${JSON.stringify(propValue)}`,
-                path: [propName],
-                expected: JSON.stringify(propSchema.const),
-                received: JSON.stringify(propValue),
-              });
-            }
-          }
-        }
-      }
-    }
-  } else if (jsonSchema.type === 'string') {
-    if (typeof data !== 'string') {
-      errors.push({
-        code: 'invalid_type',
-        message: `Expected string, but received ${typeof data}`,
-        path: [],
-        expected: 'string',
-        received: typeof data,
-      });
-    }
-  } else if (jsonSchema.type === 'number') {
-    if (typeof data !== 'number') {
-      errors.push({
-        code: 'invalid_type',
-        message: `Expected number, but received ${typeof data}`,
-        path: [],
-        expected: 'number',
-        received: typeof data,
-      });
-    }
-  }
-
+  const errors = validateValue(data, jsonSchema, { variableTypes, path: [] });
   return { success: errors.length === 0, errors };
 }
 

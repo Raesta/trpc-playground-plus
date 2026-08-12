@@ -281,9 +281,93 @@ describe('validateCode — aggregation', () => {
   });
 });
 
+describe('validateTrpcCall — nested objects (recursive)', () => {
+  const schema: RouterSchema = {
+    save: {
+      type: 'mutation',
+      inputSchema: jsonSchema(
+        z.object({
+          name: z.string(),
+          meta: z.object({
+            tag: z.string(),
+            role: z.enum(['admin', 'user']),
+            inner: z.object({ count: z.number() }).optional(),
+          }),
+          config: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('a'), a: z.string() }),
+            z.object({ kind: z.literal('b'), b: z.number() }),
+          ]),
+        }),
+      ),
+    },
+  };
+
+  const valid = {
+    name: 'Jo',
+    meta: { tag: 't', role: 'admin' as const },
+    config: { kind: 'a' as const, a: 'x' },
+  };
+
+  it('accepts a valid deeply-nested object', () => {
+    expect(validateTrpcCall(makeCall('save', 'mutation', valid), schema).isValid).toBe(true);
+  });
+
+  it('flags a nested type mismatch with a full path', () => {
+    const res = validateTrpcCall(makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, tag: 123 } }), schema);
+    const err = res.errors.find((e) => e.code === 'invalid_type' && e.path?.join('.') === 'meta.tag');
+    expect(err).toBeDefined();
+    expect(err?.expected).toBe('string');
+    expect(err?.received).toBe('number');
+  });
+
+  it('flags a missing nested required property', () => {
+    const res = validateTrpcCall(makeCall('save', 'mutation', { ...valid, meta: { role: 'admin' } }), schema);
+    expect(res.errors.some((e) => e.path?.join('.') === 'meta.tag' && e.received === 'undefined')).toBe(true);
+  });
+
+  it('flags an unrecognized nested key with a full path', () => {
+    const res = validateTrpcCall(
+      makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, oops: 1 } }),
+      schema,
+    );
+    expect(res.errors.some((e) => e.code === 'unrecognized_keys' && e.path?.join('.') === 'meta.oops')).toBe(true);
+  });
+
+  it('flags a nested enum violation with a full path', () => {
+    const res = validateTrpcCall(
+      makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, role: 'ghost' } }),
+      schema,
+    );
+    expect(res.errors.some((e) => e.code === 'invalid_enum_value' && e.path?.join('.') === 'meta.role')).toBe(true);
+  });
+
+  it('validates a deeper (2-level) nested object', () => {
+    const res = validateTrpcCall(
+      makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, inner: { count: 'nope' } } }),
+      schema,
+    );
+    expect(res.errors.some((e) => e.path?.join('.') === 'meta.inner.count' && e.expected === 'number')).toBe(true);
+  });
+
+  it('narrows a nested discriminated union and flags a wrong-variant field', () => {
+    const res = validateTrpcCall(
+      makeCall('save', 'mutation', { ...valid, config: { kind: 'a', a: 'x', b: 5 } }),
+      schema,
+    );
+    expect(res.errors.some((e) => e.code === 'unrecognized_keys' && e.path?.join('.') === 'config.b')).toBe(true);
+  });
+
+  it('flags an invalid discriminant value on a nested union', () => {
+    const res = validateTrpcCall(
+      makeCall('save', 'mutation', { ...valid, config: { kind: 'z' } }),
+      schema,
+    );
+    expect(res.errors.some((e) => e.code === 'invalid_enum_value' && e.path?.join('.') === 'config.kind')).toBe(true);
+  });
+});
+
 // --- Known gaps tracked in ROADMAP.md (§1) — pending deeper validation ---
 describe('validation gaps (ROADMAP §1)', () => {
-  it.todo('validates nested object shapes recursively');
   it.todo('validates array items against schema.items');
   it.todo('enforces constraints (min/max, minLength/maxLength, regex, email)');
   it.todo('validates unions whose members are not objects');
