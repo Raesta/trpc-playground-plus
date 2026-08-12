@@ -1,5 +1,6 @@
 import type { RouterSchema } from '../types';
 import type { TrpcCall } from './code-parser';
+import { discriminantLiterals, findDiscriminantKey, narrowUnionByLiteral, objectMembers } from './json-schema';
 
 export interface ValidationError {
   message: string;
@@ -67,23 +68,6 @@ export function resolveVariableType(value: string): string {
   } catch {
     return 'string'; // fallback: raw string
   }
-}
-
-/** Literal value of a schema that represents a single literal (const or single-value enum). */
-function singleLiteral(prop: any): any {
-  if (!prop) return undefined;
-  if (prop.const !== undefined) return prop.const;
-  if (Array.isArray(prop.enum) && prop.enum.length === 1) return prop.enum[0];
-  return undefined;
-}
-
-/** Discriminant key of a union: a property holding a single literal in every member. */
-function findDiscriminantKey(members: any[]): string | null {
-  const keys = members[0]?.properties ? Object.keys(members[0].properties) : [];
-  for (const key of keys) {
-    if (members.every((m) => singleLiteral(m.properties?.[key]) !== undefined)) return key;
-  }
-  return null;
 }
 
 /**
@@ -279,7 +263,7 @@ function validateObject(data: any, schema: any, ctx: ValidationContext): RawErro
 
 /** Union / discriminated union: narrow to the right member, then validate it. */
 function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError[] {
-  const members = schema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
+  const members = objectMembers(schema.anyOf);
   if (members.length === 0) return [];
 
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
@@ -305,9 +289,9 @@ function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError
     // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
     if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) return [];
 
-    const chosen = members.find((m: any) => singleLiteral(m.properties[discriminant]) === discValue);
+    const chosen = narrowUnionByLiteral(members, discriminant, discValue);
     if (!chosen) {
-      const allowed = members.map((m: any) => JSON.stringify(singleLiteral(m.properties[discriminant]))).join(' | ');
+      const allowed = discriminantLiterals(members, discriminant).map((v) => JSON.stringify(v)).join(' | ');
       return [
         {
           code: 'invalid_enum_value',

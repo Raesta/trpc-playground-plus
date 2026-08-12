@@ -15,8 +15,10 @@ import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
 import { useTheme } from '../ThemeContext';
 import type { ThemeConfig } from '../theme';
 import { type RouterSchema, Scope, type Variable } from '../types';
+import { findCursorObjectContext, scanBalanced } from '../utils/brace-scan';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { formatDocument, formatKeymap } from '../utils/formatter';
+import { resolveSchemaAtPath } from '../utils/json-schema';
 import { resolveVariableType, validateCodeWithCache } from '../utils/zod-validator';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -596,79 +598,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     return 'any';
   };
 
-  // Returns the literal value of a schema when it represents a single literal (const or single-value enum).
-  const singleLiteral = (prop: any): any => {
-    if (!prop) return undefined;
-    if (prop.const !== undefined) return prop.const;
-    if (Array.isArray(prop.enum) && prop.enum.length === 1) return prop.enum[0];
-    return undefined;
-  };
-
-  // Finds the discriminant key of a union: a property that holds a single literal in every member.
-  const findDiscriminantKey = (members: any[]): string | null => {
-    const keys = members[0]?.properties ? Object.keys(members[0].properties) : [];
-    for (const key of keys) {
-      if (members.every((m) => singleLiteral(m.properties?.[key]) !== undefined)) return key;
-    }
-    return null;
-  };
-
-  // Merges union object members into a single object schema: properties are unioned, differing
-  // literals on the same key collapse into an enum, and required keeps only keys required everywhere.
-  const mergeObjectSchemas = (members: any[]): any => {
-    const properties: Record<string, any> = {};
-    const requiredCounts: Record<string, number> = {};
-    for (const member of members) {
-      for (const [key, value] of Object.entries<any>(member.properties)) {
-        const existing = properties[key];
-        if (!existing) {
-          properties[key] = value;
-        } else {
-          const existingLiterals = existing.const !== undefined ? [existing.const] : existing.enum;
-          const valueLiterals = value.const !== undefined ? [value.const] : value.enum;
-          if (Array.isArray(existingLiterals) && Array.isArray(valueLiterals)) {
-            properties[key] = { enum: Array.from(new Set([...existingLiterals, ...valueLiterals])) };
-          }
-        }
-        if ((member.required || []).includes(key)) requiredCounts[key] = (requiredCounts[key] || 0) + 1;
-      }
-    }
-    const required = Object.keys(requiredCounts).filter((key) => requiredCounts[key] === members.length);
-    return { type: 'object', properties, required };
-  };
-
-  // Resolves the effective object schema to drive input-field completion. Plain objects pass through;
-  // unions (anyOf) narrow to the member matching the already-typed discriminant, else merge all members.
-  const resolveInputObjectSchema = (inputSchema: any, typedObjectContent: string): any => {
-    if (!inputSchema) return null;
-    if (inputSchema.type === 'object' && inputSchema.properties) return inputSchema;
-    if (Array.isArray(inputSchema.anyOf)) {
-      const members = inputSchema.anyOf.filter((m: any) => m && m.type === 'object' && m.properties);
-      if (members.length === 0) return null;
-      const discriminant = findDiscriminantKey(members);
-      if (discriminant) {
-        // Discriminant already chosen: narrow to the matching variant so only its fields are offered.
-        if (typedObjectContent) {
-          const match = typedObjectContent.match(new RegExp(`${discriminant}\\s*:\\s*["']([^"']+)["']`));
-          if (match) {
-            const chosen = members.find((m: any) => String(singleLiteral(m.properties[discriminant])) === match[1]);
-            if (chosen) return chosen;
-          }
-        }
-        // Not chosen yet: only offer the discriminant, with every variant's literal as a value option.
-        const literals = Array.from(new Set(members.map((m: any) => singleLiteral(m.properties[discriminant]))));
-        return {
-          type: 'object',
-          properties: { [discriminant]: { enum: literals } },
-          required: [discriminant],
-        };
-      }
-      // Non-discriminated union: fall back to merging all members' properties.
-      return mergeObjectSchemas(members);
-    }
-    return null;
-  };
-
   const getCompletionsFromPath = (path: string[]): CompletionResult['options'] => {
     if (path.length === 0 || path[0] === '') {
       return Object.entries(schema).map(([key, def]) => {
@@ -872,57 +801,33 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
           const fullText = context.state.doc.toString();
           const fullAfterProcedure = fullText.substring(procedureStart);
-          const hasOpenBrace = fullAfterProcedure.includes('{');
+          const cursorRel = context.pos - procedureStart;
+          const from = word ? word.from : context.pos;
 
-          // Extract the already-typed argument-object content (used to narrow discriminated unions).
-          let typedObjectContent = '';
-          {
-            const objBraceStart = fullAfterProcedure.indexOf('{');
-            if (objBraceStart !== -1) {
-              let depth = 1;
-              let scanPos = objBraceStart + 1;
-              while (scanPos < fullAfterProcedure.length && depth > 0) {
-                if (fullAfterProcedure[scanPos] === '{') depth++;
-                else if (fullAfterProcedure[scanPos] === '}') depth--;
-                scanPos++;
-              }
-              typedObjectContent = fullAfterProcedure.substring(objBraceStart + 1, scanPos - 1);
+          // Read an already-typed discriminant value from the whole argument-object
+          // content (first match, quoted or not) to narrow unions at any depth.
+          const argBraceStart = fullAfterProcedure.indexOf('{');
+          const argObjectContent =
+            argBraceStart !== -1 ? scanBalanced(fullAfterProcedure, argBraceStart, '{', '}').content : '';
+          const getDiscriminantValue = (_members: any[], key: string) => {
+            const m = argObjectContent.match(new RegExp(`${key}\\s*:\\s*(?:"([^"]*)"|'([^']*)'|([^,}\\s]+))`));
+            if (!m) return undefined;
+            if (m[1] !== undefined) return m[1];
+            if (m[2] !== undefined) return m[2];
+            try {
+              return JSON.parse(m[3]);
+            } catch {
+              return m[3];
             }
-          }
+          };
 
-          const effectiveSchema = resolveInputObjectSchema(inputSchema, typedObjectContent);
+          const rootSchema = resolveSchemaAtPath(inputSchema, [], getDiscriminantValue);
 
-          if (effectiveSchema) {
-            // Check if cursor is right after "propertyName: " (enum/const value slot)
-            const beforeCursor = text.substring(procedureStart);
-            const valueSlotMatch = beforeCursor.match(/(\w+)\s*:\s*(["']?)(\w*)$/);
-            if (valueSlotMatch) {
-              const propName = valueSlotMatch[1];
-              const quote = valueSlotMatch[2];
-              const partial = valueSlotMatch[3];
-              const propSchema = (effectiveSchema.properties as any)[propName];
-              if (propSchema) {
-                const values: any[] = [];
-                if (propSchema.const !== undefined) values.push(propSchema.const);
-                if (Array.isArray(propSchema.enum)) values.push(...propSchema.enum);
-                if (values.length > 0) {
-                  const from = context.pos - partial.length - quote.length;
-                  return {
-                    from,
-                    options: values.map((v) => ({
-                      label: JSON.stringify(v),
-                      type: 'constant',
-                      boost: 100,
-                      apply: JSON.stringify(v),
-                    })),
-                  };
-                }
-              }
-            }
+          if (rootSchema?.properties) {
+            const cursorCtx = findCursorObjectContext(fullAfterProcedure, cursorRel);
 
-            const from = word ? word.from : context.pos;
-
-            if (!hasOpenBrace) {
+            // Cursor not inside the argument object yet → offer to create it.
+            if (!cursorCtx) {
               return {
                 from,
                 options: [
@@ -931,9 +836,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                     type: 'text',
                     boost: 20,
                     apply: (view, _completion, from, to) => {
-                      const text = '{}';
                       view.dispatch({
-                        changes: { from, to, insert: text },
+                        changes: { from, to, insert: '{}' },
                         selection: { anchor: from + 1 },
                       });
                     },
@@ -942,31 +846,31 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ...argVariableOptions,
                 ],
               };
-            } else {
-              const usedKeys = new Set<string>();
-              const braceStart = fullAfterProcedure.indexOf('{');
-              if (braceStart !== -1) {
-                let depth = 1;
-                let scanPos = braceStart + 1;
-                while (scanPos < fullAfterProcedure.length && depth > 0) {
-                  if (fullAfterProcedure[scanPos] === '{') depth++;
-                  else if (fullAfterProcedure[scanPos] === '}') depth--;
-                  scanPos++;
-                }
-                const objectContent = fullAfterProcedure.substring(braceStart + 1, scanPos - 1);
-                const propertyRegex = /(\w+)\s*:/g;
-                for (
-                  let propMatch = propertyRegex.exec(objectContent);
-                  propMatch !== null;
-                  propMatch = propertyRegex.exec(objectContent)
-                ) {
-                  usedKeys.add(propMatch[1]);
-                }
-                const tokens = objectContent.split(',');
-                for (const token of tokens) {
-                  const trimmed = token.trim();
-                  if (/^\w+$/.test(trimmed)) {
-                    usedKeys.add(trimmed);
+            }
+
+            // Resolve the schema of the object the cursor is actually in (nested-aware).
+            const resolvedSchema = resolveSchemaAtPath(inputSchema, cursorCtx.path, getDiscriminantValue);
+
+            if (resolvedSchema?.properties) {
+              // Value slot: cursor right after `key: ` → offer that property's enum/const values.
+              if (cursorCtx.valueSlot) {
+                const propSchema = (resolvedSchema.properties as any)[cursorCtx.valueSlot.key];
+                if (propSchema) {
+                  const values: any[] = [];
+                  if (propSchema.const !== undefined) values.push(propSchema.const);
+                  if (Array.isArray(propSchema.enum)) values.push(...propSchema.enum);
+                  if (values.length > 0) {
+                    const valueFrom =
+                      context.pos - cursorCtx.valueSlot.partial.length - cursorCtx.valueSlot.quote.length;
+                    return {
+                      from: valueFrom,
+                      options: values.map((v) => ({
+                        label: JSON.stringify(v),
+                        type: 'constant',
+                        boost: 100,
+                        apply: JSON.stringify(v),
+                      })),
+                    };
                   }
                 }
               }
@@ -978,9 +882,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 return lastChar !== ',' && lastChar !== '{' && lastChar !== '[';
               })();
 
-              const required = effectiveSchema.required || [];
-              const options = Object.entries(effectiveSchema.properties)
-                .filter(([key]) => !usedKeys.has(key))
+              const required = resolvedSchema.required || [];
+              const options = Object.entries(resolvedSchema.properties)
+                .filter(([key]) => !cursorCtx.usedKeys.has(key))
                 .map(([key, propSchema]: [string, any]) => {
                   const isRequired = required.includes(key);
                   const type = formatSchemaType(propSchema);
@@ -1015,8 +919,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 options: [...options, ...argVariableOptions],
               };
             }
+
+            if (argVariableOptions.length > 0) return { from, options: argVariableOptions };
           } else if (argVariableOptions.length > 0) {
-            const from = word ? word.from : context.pos;
             return { from, options: argVariableOptions };
           }
         }
