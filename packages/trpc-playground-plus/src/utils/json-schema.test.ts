@@ -3,6 +3,7 @@ import {
   ARRAY_ITEMS,
   discriminantLiterals,
   findDiscriminantKey,
+  literalValues,
   mergeObjectSchemas,
   narrowUnionByLiteral,
   objectMembers,
@@ -106,6 +107,25 @@ describe('resolveUnionObjectSchema', () => {
     const b = { type: 'object', properties: { y: { type: 'number' } }, required: ['y'] };
     const merged = resolveUnionObjectSchema([a, b]);
     expect(Object.keys(merged.properties).sort()).toEqual(['x', 'y']);
+  });
+});
+
+describe('literalValues', () => {
+  it('reads a direct const', () => expect(literalValues({ type: 'string', const: 'x' })).toEqual(['x']));
+  it('reads a direct enum', () => expect(literalValues({ type: 'string', enum: ['a', 'b'] })).toEqual(['a', 'b']));
+  it('flattens an anyOf of const literals (z.union of z.literal)', () => {
+    const schema = { anyOf: [{ type: 'string', const: 'sm' }, { type: 'string', const: 'md' }, { type: 'string', const: 'lg' }] };
+    expect(literalValues(schema)).toEqual(['sm', 'md', 'lg']);
+  });
+  it('flattens an anyOf mixing enum members', () => {
+    expect(literalValues({ anyOf: [{ enum: ['a', 'b'] }, { const: 'c' }] })).toEqual(['a', 'b', 'c']);
+  });
+  it('dedupes repeated literals', () => {
+    expect(literalValues({ anyOf: [{ const: 'x' }, { enum: ['x', 'y'] }] })).toEqual(['x', 'y']);
+  });
+  it('returns [] for a free-form scalar or missing schema', () => {
+    expect(literalValues({ type: 'string' })).toEqual([]);
+    expect(literalValues(undefined)).toEqual([]);
   });
 });
 

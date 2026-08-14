@@ -22,6 +22,23 @@ export function singleLiteral(prop: any): any {
   return undefined;
 }
 
+/**
+ * Collect the finite set of literal values a schema allows: a direct `const`, an
+ * `enum`, or an `anyOf` of such members (e.g. `z.union([z.literal('sm'), z.literal('md')])`
+ * → `['sm', 'md']`). Returns `[]` when the schema is not a finite literal set. Drives
+ * value-completion so unions of literals are suggested just like a plain enum.
+ */
+export function literalValues(schema: any): any[] {
+  if (!schema) return [];
+  const out: any[] = [];
+  if (schema.const !== undefined) out.push(schema.const);
+  if (Array.isArray(schema.enum)) out.push(...schema.enum);
+  if (Array.isArray(schema.anyOf)) {
+    for (const member of schema.anyOf) out.push(...literalValues(member));
+  }
+  return Array.from(new Set(out));
+}
+
 /** Keep only the object members of an `anyOf` (the ones we can validate / complete). */
 export function objectMembers(anyOf: any[] | undefined): any[] {
   if (!Array.isArray(anyOf)) return [];

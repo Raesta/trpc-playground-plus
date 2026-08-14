@@ -18,7 +18,7 @@ import { type RouterSchema, Scope, type Variable } from '../types';
 import { findCursorObjectContext, scanBalanced } from '../utils/brace-scan';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { formatDocument, formatKeymap } from '../utils/formatter';
-import { resolveSchemaAtPath } from '../utils/json-schema';
+import { literalValues, resolveSchemaAtPath } from '../utils/json-schema';
 import { resolveVariableType, validateCodeWithCache } from '../utils/zod-validator';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -875,10 +875,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ],
                 };
               }
-              // Enum/const items → offer the allowed literal values directly.
-              const itemValues: any[] = [];
-              if (resolvedSchema?.const !== undefined) itemValues.push(resolvedSchema.const);
-              if (Array.isArray(resolvedSchema?.enum)) itemValues.push(...resolvedSchema.enum);
+              // Enum/const/literal-union items → offer the allowed literal values directly.
+              const itemValues = literalValues(resolvedSchema);
               if (itemValues.length > 0) {
                 return {
                   from,
@@ -898,20 +896,29 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               if (cursorCtx.valueSlot) {
                 const propSchema = (resolvedSchema.properties as any)[cursorCtx.valueSlot.key];
                 if (propSchema) {
-                  const values: any[] = [];
-                  if (propSchema.const !== undefined) values.push(propSchema.const);
-                  if (Array.isArray(propSchema.enum)) values.push(...propSchema.enum);
+                  const values = literalValues(propSchema);
                   if (values.length > 0) {
-                    const valueFrom =
-                      context.pos - cursorCtx.valueSlot.partial.length - cursorCtx.valueSlot.quote.length;
+                    const { quote } = cursorCtx.valueSlot;
+                    const valueFrom = context.pos - cursorCtx.valueSlot.partial.length - quote.length;
                     return {
                       from: valueFrom,
-                      options: values.map((v) => ({
-                        label: JSON.stringify(v),
-                        type: 'constant',
-                        boost: 100,
-                        apply: JSON.stringify(v),
-                      })),
+                      options: values.map((v) => {
+                        const insert = JSON.stringify(v);
+                        return {
+                          label: insert,
+                          type: 'constant',
+                          boost: 100,
+                          // Replace the (possibly quoted) partial, swallowing an auto-closed or
+                          // typed trailing quote so we never end up with `"lg""`.
+                          apply: (view: EditorView, _completion: unknown, from: number, to: number) => {
+                            const end = quote && view.state.doc.sliceString(to, to + 1) === quote ? to + 1 : to;
+                            view.dispatch({
+                              changes: { from, to: end, insert },
+                              selection: { anchor: from + insert.length },
+                            });
+                          },
+                        };
+                      }),
                     };
                   }
                 }

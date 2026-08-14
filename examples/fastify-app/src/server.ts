@@ -169,6 +169,19 @@ const appRouter = t.router({
     .output(z.object({ ok: z.boolean() }))
     .mutation(() => ({ ok: true })),
 
+  // Non-object unions (scalar / literal / nullable).
+  // try: trpc.setValue.mutate({ id: true }) → rejected (neither string nor number)
+  setValue: t.procedure
+    .input(
+      z.object({
+        id: z.union([z.string(), z.number()]),
+        label: z.string().nullable(),
+        size: z.union([z.literal('sm'), z.literal('md'), z.literal('lg')]),
+      }),
+    )
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(() => ({ ok: true })),
+
   user: userRouter,
   post: postRouter,
   arrays: arrayRouter,

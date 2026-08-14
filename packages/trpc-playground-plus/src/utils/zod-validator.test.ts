@@ -508,7 +508,50 @@ describe('validateTrpcCall — constraints', () => {
   });
 });
 
-// --- Known gaps tracked in ROADMAP.md (§1) — pending deeper validation ---
-describe('validation gaps (ROADMAP §1)', () => {
-  it.todo('validates unions whose members are not objects');
+describe('validateTrpcCall — non-object unions', () => {
+  const schema: RouterSchema = {
+    choose: { type: 'mutation', inputSchema: jsonSchema(z.object({ v: z.union([z.string(), z.number()]) })) },
+    maybe: { type: 'mutation', inputSchema: jsonSchema(z.object({ v: z.string().nullable() })) },
+    lit: { type: 'mutation', inputSchema: jsonSchema(z.object({ v: z.union([z.literal('a'), z.literal('b')]) })) },
+    mixed: {
+      type: 'mutation',
+      inputSchema: jsonSchema(z.object({ v: z.union([z.object({ k: z.string() }), z.string()]) })),
+    },
+    scalarTop: { type: 'mutation', inputSchema: jsonSchema(z.union([z.string(), z.number()])) },
+  };
+  const run = (proc: string, v: any) => validateTrpcCall(makeCall(proc, 'mutation', v), schema);
+
+  it('accepts each branch of a scalar union', () => {
+    expect(run('choose', { v: 'hello' }).isValid).toBe(true);
+    expect(run('choose', { v: 42 }).isValid).toBe(true);
+  });
+  it('rejects a value matching no branch of a scalar union', () => {
+    expect(run('choose', { v: true }).isValid).toBe(false);
+  });
+
+  it('accepts both a string and null for a nullable', () => {
+    expect(run('maybe', { v: 'x' }).isValid).toBe(true);
+    expect(run('maybe', { v: null }).isValid).toBe(true);
+  });
+  it('rejects a number for a string-nullable (null member is not a catch-all)', () => {
+    expect(run('maybe', { v: 5 }).isValid).toBe(false);
+  });
+
+  it('accepts a valid literal and rejects an unknown one', () => {
+    expect(run('lit', { v: 'a' }).isValid).toBe(true);
+    expect(run('lit', { v: 'z' }).isValid).toBe(false);
+  });
+
+  it('handles a union mixing an object and a scalar member', () => {
+    expect(run('mixed', { v: 'plain' }).isValid).toBe(true);
+    expect(run('mixed', { v: { k: 'ok' } }).isValid).toBe(true);
+    expect(run('mixed', { v: { k: 123 } }).isValid).toBe(false);
+    expect(run('mixed', { v: 42 }).isValid).toBe(false);
+  });
+
+  it('validates a top-level scalar union', () => {
+    expect(run('scalarTop', 'hi').isValid).toBe(true);
+    expect(run('scalarTop', 7).isValid).toBe(true);
+    expect(run('scalarTop', true).isValid).toBe(false);
+  });
 });

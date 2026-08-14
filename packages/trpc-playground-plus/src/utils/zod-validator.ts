@@ -125,7 +125,8 @@ function validateValue(data: any, schema: any, ctx: ValidationContext): RawError
     schema.type === 'string' ||
     schema.type === 'number' ||
     schema.type === 'integer' ||
-    schema.type === 'boolean'
+    schema.type === 'boolean' ||
+    schema.type === 'null'
   ) {
     return validateScalar(data, schema, ctx);
   }
@@ -367,53 +368,68 @@ function validateArray(data: any, schema: any, ctx: ValidationContext): RawError
   return errors;
 }
 
-/** Union / discriminated union: narrow to the right member, then validate it. */
+/**
+ * Union handling, in order of specificity:
+ *  1. discriminated union (all-object members sharing a literal key) → narrow & validate the variant
+ *  2. all-object union but the value isn't an object → clear "expected object" mismatch
+ *  3. general union (non-discriminated objects, or unions including non-object members like
+ *     `string | number`, `string | null`, literal unions) → pass if any member validates,
+ *     otherwise report the closest member's errors.
+ */
 function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError[] {
-  const members = objectMembers(schema.anyOf);
-  if (members.length === 0) return [];
+  const allMembers: any[] = Array.isArray(schema.anyOf) ? schema.anyOf.filter(Boolean) : [];
+  if (allMembers.length === 0) return [];
 
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+  const objMembers = objectMembers(schema.anyOf);
+  const allObjects = objMembers.length === allMembers.length;
+  const dataIsObject = typeof data === 'object' && data !== null && !Array.isArray(data);
+
+  // (1) Discriminated union.
+  if (allObjects && dataIsObject) {
+    const discriminant = findDiscriminantKey(objMembers);
+    if (discriminant) {
+      // Missing discriminant → surface it as a required-property error.
+      if (!(discriminant in data)) {
+        return [
+          {
+            code: 'missing_property',
+            message: `Required property "${discriminant}" is missing`,
+            path: [...ctx.path, discriminant],
+          },
+        ];
+      }
+
+      const discValue = data[discriminant];
+      // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
+      if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) return [];
+
+      const chosen = narrowUnionByLiteral(objMembers, discriminant, discValue);
+      if (!chosen) {
+        const allowed = discriminantLiterals(objMembers, discriminant).map((v) => JSON.stringify(v)).join(' | ');
+        return [
+          {
+            code: 'invalid_enum_value',
+            message: `Expected one of ${allowed}, received ${JSON.stringify(discValue)}`,
+            path: [...ctx.path, discriminant],
+            expected: allowed,
+            received: JSON.stringify(discValue),
+          },
+        ];
+      }
+
+      // Validate against the matched variant only.
+      return validateObject(data, chosen, ctx);
+    }
+  }
+
+  // (2) Pure object union but the value isn't an object → clear type mismatch.
+  if (allObjects && !dataIsObject) {
     return [typeMismatch('object', typeOf(data), ctx)];
   }
 
-  const discriminant = findDiscriminantKey(members);
-  if (discriminant) {
-    // Missing discriminant → surface it as a required-property error.
-    if (!(discriminant in data)) {
-      return [
-        {
-          code: 'missing_property',
-          message: `Required property "${discriminant}" is missing`,
-          path: [...ctx.path, discriminant],
-        },
-      ];
-    }
-
-    const discValue = data[discriminant];
-    // Discriminant provided as a variable / JS expression: can't narrow reliably, skip strict checks.
-    if (typeof discValue === 'string' && discValue.startsWith('__JS_EXPR__')) return [];
-
-    const chosen = narrowUnionByLiteral(members, discriminant, discValue);
-    if (!chosen) {
-      const allowed = discriminantLiterals(members, discriminant).map((v) => JSON.stringify(v)).join(' | ');
-      return [
-        {
-          code: 'invalid_enum_value',
-          message: `Expected one of ${allowed}, received ${JSON.stringify(discValue)}`,
-          path: [...ctx.path, discriminant],
-          expected: allowed,
-          received: JSON.stringify(discValue),
-        },
-      ];
-    }
-
-    // Validate against the matched variant only.
-    return validateObject(data, chosen, ctx);
-  }
-
-  // Non-discriminated union: succeed if any member matches, else the closest one's errors.
+  // (3) General union: succeed if any member matches, else the closest one's errors.
   let best: RawError[] | null = null;
-  for (const member of members) {
+  for (const member of allMembers) {
     const errs = validateValue(data, member, ctx);
     if (errs.length === 0) return [];
     if (!best || errs.length < best.length) best = errs;
