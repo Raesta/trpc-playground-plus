@@ -7,11 +7,21 @@ import {
 import { javascript } from '@codemirror/lang-javascript';
 import { foldGutter } from '@codemirror/language';
 import { type Diagnostic, linter } from '@codemirror/lint';
+import { search } from '@codemirror/search';
 import { StateEffect, StateField } from '@codemirror/state';
-import { Decoration, type DecorationSet, EditorView, GutterMarker, gutter, type ViewUpdate } from '@codemirror/view';
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  GutterMarker,
+  gutter,
+  keymap,
+  type ViewUpdate,
+} from '@codemirror/view';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
+import { createSearchKeymap, createSearchTheme } from '../searchTheme';
 import { useTheme } from '../ThemeContext';
 import type { ThemeConfig } from '../theme';
 import { type RouterSchema, Scope, type Variable } from '../types';
@@ -19,6 +29,8 @@ import { findCursorObjectContext, scanBalanced } from '../utils/brace-scan';
 import { parseCodeForTrpcCalls } from '../utils/code-parser';
 import { formatDocument, formatKeymap } from '../utils/formatter';
 import { literalValues, resolveSchemaAtPath } from '../utils/json-schema';
+import { DEFAULT_RUN_KEY } from '../utils/keybinding';
+import { findTrpcCalls, pickCallAtCursor } from '../utils/run-keymap';
 import { resolveVariableType, validateCodeWithCache } from '../utils/zod-validator';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -32,6 +44,8 @@ interface CodeEditorProps {
   onTabDrawerClick?: () => void;
   tabDrawerErrors?: string[];
   fontSize?: number;
+  runShortcut?: string;
+  searchShortcut?: string;
 }
 
 const setExecutingRangeEffect = StateEffect.define<{ from: number; to: number } | null>();
@@ -350,6 +364,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onTabDrawerClick,
   tabDrawerErrors,
   fontSize = 15,
+  runShortcut = DEFAULT_RUN_KEY,
+  searchShortcut,
 }) => {
   const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
@@ -1066,37 +1082,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   });
 
-  const findTrpcCalls = (text: string): { start: number; end: number; code: string }[] => {
-    const calls: { start: number; end: number; code: string }[] = [];
-    const regex = /trpc\.\w+(?:\.\w+)*\.(query|mutate)\(/g;
-    for (let match = regex.exec(text); match !== null; match = regex.exec(text)) {
-      const start = match.index;
-      let pos = start + match[0].length;
-      let openParens = 1;
-
-      const lineStart = text.lastIndexOf('\n', start) + 1;
-      const linePrefix = text.substring(lineStart, start).trim();
-
-      if (linePrefix === '') {
-        while (pos < text.length && openParens > 0) {
-          if (text[pos] === '(') openParens++;
-          else if (text[pos] === ')') openParens--;
-          pos++;
-        }
-
-        if (openParens === 0) {
-          calls.push({
-            start,
-            end: pos,
-            code: text.substring(start, pos),
-          });
-        }
-      }
-    }
-
-    return calls;
-  };
-
   interface CallLineData {
     code: string;
     from: number;
@@ -1184,6 +1169,31 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     if (view) formatDocument(view);
   }, []);
 
+  // Configurable "run request" shortcut: execute the tRPC call at the cursor.
+  const runKeymap = useMemo(
+    () =>
+      keymap.of([
+        {
+          key: runShortcut,
+          preventDefault: true,
+          run: (view) => {
+            if (!onPlayRequest) return false;
+            const target = pickCallAtCursor(
+              findTrpcCalls(view.state.doc.toString()),
+              view.state.selection.main.head,
+            );
+            if (!target) return false;
+            onPlayRequest(target.code, { from: target.start, to: target.end });
+            return true;
+          },
+        },
+      ]),
+    [runShortcut, onPlayRequest],
+  );
+
+  const searchTheme = useMemo(() => createSearchTheme(theme), [theme]);
+  const searchKeymapExt = useMemo(() => createSearchKeymap(searchShortcut), [searchShortcut]);
+
   const executingHighlightExtension = useMemo(
     () =>
       EditorView.decorations.compute([executingRangeField], (state): DecorationSet => {
@@ -1227,6 +1237,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         basicSetup={{ lineNumbers: false, foldGutter: false }}
         extensions={[
           formatKeymap,
+          runKeymap,
+          search({ top: true }),
+          searchKeymapExt,
+          searchTheme,
           javascript({ typescript: true }),
           editorTheme,
           executingRangeField,

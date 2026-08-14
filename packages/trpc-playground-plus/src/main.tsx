@@ -1,14 +1,26 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { EditorView } from '@codemirror/view';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ExportButton } from './components/ExportButton';
 import Settings from './components/Settings';
 import TabCodeEditor from './components/TabCodeEditor';
 import VarsHeadersDrawer from './components/VarsHeadersDrawer';
+import { toggleSearchPanel } from './searchTheme';
 import { loadSettings, saveSettings } from './settings';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { getTheme } from './theme';
-import { type CallInfo, type Header, Scope, type Tab, type Variable, type VariableType } from './types';
+import {
+  type CallInfo,
+  type Header,
+  type PlaygroundSettings,
+  Scope,
+  type Tab,
+  type Variable,
+  type VariableType,
+} from './types';
 import { getDrawerErrors } from './utils/drawer-errors';
+import { eventToKeyString } from './utils/keybinding';
+import { findTrpcCalls, pickCallAtCursor } from './utils/run-keymap';
 import { getStorageKey } from './utils/storage-keys';
 import { createDynamicTRPCClient } from './utils/trpc/trpc-client';
 import { validateVariableValue } from './utils/variable-validation';
@@ -116,6 +128,7 @@ const Playground = () => {
   const [splitPosition, setSplitPosition] = useState(() => loadSettings().splitPosition);
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
   const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
+  const [keybindings, setKeybindings] = useState(() => loadSettings().keybindings);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleSplitChange = useCallback(
@@ -127,12 +140,15 @@ const Playground = () => {
   );
 
   const handleSettingsChange = useCallback(
-    (partial: Partial<{ splitPosition: number; fontSize: number; requestTimeout: number }>) => {
+    (partial: Partial<PlaygroundSettings>) => {
       if (partial.fontSize !== undefined) {
         setFontSize(partial.fontSize);
       }
       if (partial.requestTimeout !== undefined) {
         setRequestTimeout(partial.requestTimeout);
+      }
+      if (partial.keybindings !== undefined) {
+        setKeybindings((prev) => ({ ...prev, ...partial.keybindings }));
       }
       saveSettings(partial, config?.projectKey);
     },
@@ -220,6 +236,44 @@ const Playground = () => {
         : getDrawerErrors([], [], globalVariables, globalHeaders),
     [activeTab, globalVariables, globalHeaders],
   );
+
+  // Latest `executeSpecificCode` (defined after the early return below), read by the
+  // app-level shortcut handler so it can run without a CodeMirror having focus.
+  const runRef = useRef<((code: string, range?: { from: number; to: number }) => void) | null>(null);
+
+  // App-level shortcuts: the run/search keybindings work from anywhere in the
+  // playground, not only when a CodeMirror editor has focus. When an editor already
+  // has focus we defer to its own keymap so the action targets that editor.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const key = eventToKeyString(e);
+      if (!key || (key !== keybindings.run && key !== keybindings.search)) return;
+
+      const codeDom = document.querySelector<HTMLElement>('.cm-editor'); // code editor is first in the layout
+      if (!codeDom) return;
+      const view = EditorView.findFromDOM(codeDom);
+      if (!view) return;
+
+      const focusedEditor = (document.activeElement as HTMLElement | null)?.closest?.('.cm-editor') ?? null;
+
+      if (key === keybindings.search) {
+        // A focused editor toggles its own search; from anywhere else, toggle the code editor's.
+        if (focusedEditor) return;
+        e.preventDefault();
+        toggleSearchPanel(view);
+      } else if (key === keybindings.run) {
+        // The code editor's own keymap handles this when it's focused.
+        if (focusedEditor === codeDom) return;
+        const target = pickCallAtCursor(findTrpcCalls(view.state.doc.toString()), view.state.selection.main.head);
+        if (target) {
+          e.preventDefault();
+          runRef.current?.(target.code, { from: target.start, to: target.end });
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [keybindings]);
 
   if (!config) {
     return <div>Loading playground...</div>;
@@ -317,6 +371,8 @@ const Playground = () => {
       setIsLoading(false);
     }
   };
+  // Keep the latest executor reachable from the app-level shortcut effect above.
+  runRef.current = executeSpecificCode;
 
   const importStructure = () => {
     const fileInput = document.createElement('input');
@@ -433,7 +489,7 @@ const Playground = () => {
       <Settings
         open={settingsOpen}
         setOpen={setSettingsOpen}
-        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout }}
+        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout, keybindings }}
         onSettingsChange={handleSettingsChange}
       />
       <div style={{ padding: 10, fontFamily: theme.font.sans }}>
@@ -522,6 +578,8 @@ const Playground = () => {
             onTabDrawerClick={() => setTabDrawerOpen(!tabDrawerOpen)}
             tabDrawerErrors={tabErrors}
             fontSize={fontSize}
+            runShortcut={keybindings.run}
+            searchShortcut={keybindings.search}
           />
         </div>
       </div>

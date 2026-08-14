@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { saveSettings } from '../settings';
 import { useTheme } from '../ThemeContext';
 import type { PlaygroundSettings } from '../types';
+import { DEFAULT_RUN_KEY, DEFAULT_SEARCH_KEY } from '../utils/keybinding';
+import { KeybindingInput } from './KeybindingInput';
 
 interface SettingsProps {
   open: boolean;
@@ -204,6 +206,27 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Shortcuts */}
+            <div style={sectionTitleStyle}>Shortcuts</div>
+
+            <div style={settingRowStyle}>
+              <label style={labelStyle}>Run request</label>
+              <KeybindingInput
+                value={settings.keybindings.run}
+                defaultValue={DEFAULT_RUN_KEY}
+                onChange={(key) => onSettingsChange({ keybindings: { ...settings.keybindings, run: key } })}
+              />
+            </div>
+
+            <div style={settingRowStyle}>
+              <label style={labelStyle}>Open search (request editor)</label>
+              <KeybindingInput
+                value={settings.keybindings.search}
+                defaultValue={DEFAULT_SEARCH_KEY}
+                onChange={(key) => onSettingsChange({ keybindings: { ...settings.keybindings, search: key } })}
+              />
             </div>
           </div>
         </>

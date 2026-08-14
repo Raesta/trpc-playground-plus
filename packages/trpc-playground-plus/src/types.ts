@@ -76,9 +76,18 @@ export interface CallInfo {
 
 export type ThemeMode = 'dark' | 'light';
 
+/** User-configurable keyboard shortcuts (CodeMirror key syntax, e.g. "Mod-Enter"). */
+export interface KeyBindings {
+  /** Run the tRPC call at the cursor. */
+  run: string;
+  /** Open the search panel (in the request editor). */
+  search: string;
+}
+
 export interface PlaygroundSettings {
   splitPosition: number;
   fontSize: number;
   theme: ThemeMode;
   requestTimeout: number;
+  keybindings: KeyBindings;
 }

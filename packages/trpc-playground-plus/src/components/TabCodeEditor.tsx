@@ -24,6 +24,8 @@ interface TabCodeEditorProps {
   onTabDrawerClick?: () => void;
   tabDrawerErrors?: string[];
   fontSize?: number;
+  runShortcut?: string;
+  searchShortcut?: string;
 }
 
 const DIVIDER_HIT = 16;
@@ -45,6 +47,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   onTabDrawerClick,
   tabDrawerErrors,
   fontSize,
+  runShortcut,
+  searchShortcut,
 }) => {
   const theme = useTheme();
 
@@ -262,6 +266,8 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
               onTabDrawerClick={onTabDrawerClick}
               tabDrawerErrors={tabDrawerErrors}
               fontSize={fontSize}
+              runShortcut={runShortcut}
+              searchShortcut={searchShortcut}
             />
           )}
         </div>
@@ -302,6 +308,7 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
             isLoading={isLoading}
             callInfo={callInfo}
             fontSize={fontSize}
+            searchShortcut={searchShortcut}
           />
         </div>
       </div>

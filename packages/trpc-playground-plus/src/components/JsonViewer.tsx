@@ -1,8 +1,10 @@
 import { json } from '@codemirror/lang-json';
+import { search } from '@codemirror/search';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import type React from 'react';
 import { useMemo, useRef } from 'react';
 import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
+import { createSearchKeymap, createSearchTheme } from '../searchTheme';
 import { useTheme } from '../ThemeContext';
 import type { CallInfo } from '../types';
 import { EditorToolbar } from './EditorToolbar';
@@ -13,6 +15,7 @@ interface JsonViewerProps {
   isLoading?: boolean;
   callInfo?: CallInfo | null;
   fontSize?: number;
+  searchShortcut?: string;
 }
 
 const spinnerKeyframes = `
@@ -74,11 +77,20 @@ const CallInfoInline: React.FC<{ info: CallInfo }> = ({ info }) => {
   );
 };
 
-export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoading, callInfo, fontSize = 15 }) => {
+export const JsonViewer: React.FC<JsonViewerProps> = ({
+  value,
+  onChange,
+  isLoading,
+  callInfo,
+  fontSize = 15,
+  searchShortcut,
+}) => {
   const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
+  const searchTheme = useMemo(() => createSearchTheme(theme), [theme]);
+  const searchKeymapExt = useMemo(() => createSearchKeymap(searchShortcut), [searchShortcut]);
 
   const styles: Record<string, React.CSSProperties> = useMemo(
     () => ({
@@ -129,7 +141,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
         ref={editorRef}
         value={value}
         theme={cmTheme}
-        extensions={[json(), editorTheme]}
+        extensions={[json(), editorTheme, search({ top: true }), searchKeymapExt, searchTheme]}
         onChange={onChange}
         editable={false}
         style={styles.editor}
