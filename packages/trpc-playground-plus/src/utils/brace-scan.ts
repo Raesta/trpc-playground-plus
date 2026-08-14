@@ -188,3 +188,226 @@ export function findCursorObjectContext(text: string, cursorOffset: number): Cur
 
   return { path, usedKeys: top.usedKeys, objectContent, valueSlot };
 }
+
+/** A half-open `[start, end)` offset range into a source string. */
+export interface Span {
+  start: number;
+  end: number;
+}
+
+const isWs = (c: string): boolean => c === ' ' || c === '\t' || c === '\n' || c === '\r';
+
+/** Trim surrounding whitespace from a `[start, end)` span over `text`. */
+function trimSpan(text: string, start: number, end: number): Span {
+  while (start < end && isWs(text[start])) start++;
+  while (end > start && isWs(text[end - 1])) end--;
+  return { start, end };
+}
+
+/**
+ * Read a single value starting at/after `from` (skipping leading whitespace),
+ * bounded by `limit`. Objects/arrays/strings are read as balanced units; scalars
+ * and JS expressions (`new Date()`) are read up to the next top-level `,`/`}`/`]`.
+ */
+function readValue(text: string, from: number, limit: number): Span {
+  let i = from;
+  while (i < limit && isWs(text[i])) i++;
+  const start = i;
+  const ch = text[i];
+  if (ch === '{') return { start, end: scanBalanced(text, i, '{', '}').end };
+  if (ch === '[') return { start, end: scanBalanced(text, i, '[', ']').end };
+  if (ch === '"' || ch === "'") {
+    let j = i + 1;
+    while (j < limit) {
+      if (text[j] === ch && text[j - 1] !== '\\') {
+        j++;
+        break;
+      }
+      j++;
+    }
+    return { start, end: j };
+  }
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+  let j = i;
+  for (; j < limit; j++) {
+    const c = text[j];
+    if (inString) {
+      if (c === stringChar && text[j - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      inString = true;
+      stringChar = c;
+    } else if (c === '(' || c === '{' || c === '[') {
+      depth++;
+    } else if (c === ')' || c === '}' || c === ']') {
+      if (depth === 0) break;
+      depth--;
+    } else if (c === ',' && depth === 0) {
+      break;
+    }
+  }
+  return trimSpan(text, start, j);
+}
+
+/** Interior `[start, end)` of the object value `span` (drops the outer braces). */
+function objectInterior(text: string, span: Span): Span | null {
+  let i = span.start;
+  while (i < span.end && isWs(text[i])) i++;
+  if (text[i] !== '{') return null;
+  const { end } = scanBalanced(text, i, '{', '}');
+  return { start: i + 1, end: end - 1 };
+}
+
+/**
+ * Walk an object interior `[s, e)` at top level, invoking `onKey` for each
+ * `key:` found. `onKey` receives the key token span and the index just after the
+ * colon; returning a non-null value stops the scan and is returned.
+ */
+function scanObjectKeys<T>(
+  text: string,
+  s: number,
+  e: number,
+  onKey: (key: string, keyStart: number, keyEnd: number, afterColon: number) => T | null,
+): T | null {
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+  for (let i = s; i < e; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === stringChar && text[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+    } else if (ch === '{' || ch === '[' || ch === '(') {
+      depth++;
+    } else if (ch === '}' || ch === ']' || ch === ')') {
+      depth--;
+    } else if (depth === 0 && IDENT.test(ch)) {
+      let j = i;
+      while (j < e && IDENT.test(text[j])) j++;
+      const word = text.slice(i, j);
+      let k = j;
+      while (k < e && isWs(text[k])) k++;
+      if (text[k] === ':') {
+        const hit = onKey(word, i, j, k + 1);
+        if (hit !== null) return hit;
+      }
+      i = j - 1;
+    }
+  }
+  return null;
+}
+
+/** Span of the value of `key` inside an object interior `[s, e)`. */
+function objectValueSpan(text: string, s: number, e: number, key: string): Span | null {
+  return scanObjectKeys(text, s, e, (word, _ks, _ke, afterColon) =>
+    word === key ? readValue(text, afterColon, e) : null,
+  );
+}
+
+/** Span of the key token `key` inside an object interior `[s, e)`. */
+function objectKeySpan(text: string, s: number, e: number, key: string): Span | null {
+  return scanObjectKeys(text, s, e, (word, keyStart, keyEnd) =>
+    word === key ? { start: keyStart, end: keyEnd } : null,
+  );
+}
+
+/** Span of array element `#index` inside the array value `span`. */
+function arrayElementSpan(text: string, span: Span, index: number): Span | null {
+  let i = span.start;
+  while (i < span.end && isWs(text[i])) i++;
+  if (text[i] !== '[') return null;
+  const { end } = scanBalanced(text, i, '[', ']');
+  const innerStart = i + 1;
+  const innerEnd = end - 1;
+
+  let idx = 0;
+  let elemStart = innerStart;
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+  for (let k = innerStart; k < innerEnd; k++) {
+    const ch = text[k];
+    if (inString) {
+      if (ch === stringChar && text[k - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+    } else if (ch === '(' || ch === '{' || ch === '[') {
+      depth++;
+    } else if (ch === ')' || ch === '}' || ch === ']') {
+      depth--;
+    } else if (ch === ',' && depth === 0) {
+      if (idx === index) return trimSpan(text, elemStart, k);
+      idx++;
+      elemStart = k + 1;
+    }
+  }
+  return idx === index ? trimSpan(text, elemStart, innerEnd) : null;
+}
+
+/** Locate the first `{ … }` object value in `text` (e.g. a call's argument object). */
+function rootObjectSpan(text: string): Span | null {
+  let inString = false;
+  let stringChar = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === stringChar && text[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+    } else if (ch === '{') {
+      return { start: i, end: scanBalanced(text, i, '{', '}').end };
+    }
+  }
+  return null;
+}
+
+/** Descend `path` from the root object value to the value span at that path. */
+function descend(text: string, path: string[]): Span | null {
+  let span = rootObjectSpan(text);
+  if (!span) return null;
+  for (const seg of path) {
+    if (/^\d+$/.test(seg)) {
+      span = arrayElementSpan(text, span, Number(seg));
+    } else {
+      const interior = objectInterior(text, span);
+      span = interior ? objectValueSpan(text, interior.start, interior.end, seg) : null;
+    }
+    if (!span) return null;
+  }
+  return span;
+}
+
+/**
+ * Offset span of the value at `path` (object keys + numeric array indices) within
+ * `text` — e.g. `['users', '1', 'name']` → the span of that item's `name` value.
+ * Returns `null` when any segment can't be resolved (e.g. a missing key).
+ */
+export function findValueSpanAtPath(text: string, path: string[]): Span | null {
+  return descend(text, path);
+}
+
+/**
+ * Offset span of the *key token* for `path`'s last segment (the containing object
+ * is resolved from the preceding segments). Used to highlight an unrecognized key.
+ */
+export function findKeySpanAtPath(text: string, path: string[]): Span | null {
+  if (path.length === 0) return null;
+  const parentSpan = descend(text, path.slice(0, -1));
+  if (!parentSpan) return null;
+  const interior = objectInterior(text, parentSpan);
+  if (!interior) return null;
+  return objectKeySpan(text, interior.start, interior.end, path[path.length - 1]);
+}

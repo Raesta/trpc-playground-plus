@@ -396,6 +396,18 @@ describe('validateTrpcCall — arrays', () => {
     const res = validateTrpcCall(makeCall('addUsers', 'mutation', { users: [{ name: 'ok' }, { name: 42 }] }), schema);
     expect(res.errors.some((e) => e.path?.join('.') === 'users.1.name' && e.expected === 'string')).toBe(true);
   });
+
+  it('highlights the offending array item, not the first one', () => {
+    const rawCall = 'trpc.addUsers.mutate({ users: [{ name: "a" }, { name: 42 }] })';
+    const res = validateTrpcCall(
+      makeCall('addUsers', 'mutation', { users: [{ name: 'a' }, { name: 42 }] }, rawCall),
+      schema,
+    );
+    const err = res.errors.find((e) => e.path?.join('.') === 'users.1.name');
+    expect(err).toBeDefined();
+    // position offsets index directly into rawCall (call.position.start === 0).
+    expect(rawCall.slice(err!.position.start, err!.position.end)).toBe('42');
+  });
 });
 
 // --- Known gaps tracked in ROADMAP.md (§1) — pending deeper validation ---

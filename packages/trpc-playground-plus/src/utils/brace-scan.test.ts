@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findCursorObjectContext, scanBalanced, splitTopLevel } from './brace-scan';
+import { findCursorObjectContext, findKeySpanAtPath, findValueSpanAtPath, scanBalanced, splitTopLevel } from './brace-scan';
 
 describe('splitTopLevel', () => {
   it('splits a flat list', () => {
@@ -113,4 +113,33 @@ describe('findCursorObjectContext', () => {
     expect(ctx?.path).toEqual(['meta']);
     expect(ctx?.valueSlot).toEqual({ key: 'role', quote: '"', partial: 'ad' });
   });
+});
+
+describe('findValueSpanAtPath', () => {
+  const call = 'trpc.a.mutate({ name: "x", meta: { tag: 7 }, when: new Date(), users: [{ name: "a" }, { name: 42 }] })';
+  const at = (path: string[]) => {
+    const span = findValueSpanAtPath(call, path);
+    return span ? call.slice(span.start, span.end) : null;
+  };
+
+  it('locates a top-level value', () => expect(at(['name'])).toBe('"x"'));
+  it('locates a nested value', () => expect(at(['meta', 'tag'])).toBe('7'));
+  it('locates a JS expression value (parens kept whole)', () => expect(at(['when'])).toBe('new Date()'));
+  it('locates a whole array element', () => expect(at(['users', '1'])).toBe('{ name: 42 }'));
+  it('locates a value inside a specific array element', () => expect(at(['users', '1', 'name'])).toBe('42'));
+  it('does not confuse the first array element with the second', () => expect(at(['users', '0', 'name'])).toBe('"a"'));
+  it('returns null for a missing key', () => expect(findValueSpanAtPath(call, ['nope'])).toBeNull());
+  it('returns null for an out-of-range index', () => expect(findValueSpanAtPath(call, ['users', '5'])).toBeNull());
+});
+
+describe('findKeySpanAtPath', () => {
+  const at = (call: string, path: string[]) => {
+    const span = findKeySpanAtPath(call, path);
+    return span ? call.slice(span.start, span.end) : null;
+  };
+
+  it('locates a top-level key token', () => expect(at('trpc.a.mutate({ oops: 1 })', ['oops'])).toBe('oops'));
+  it('locates a nested key token', () => expect(at('trpc.a.mutate({ meta: { oops: 1 } })', ['meta', 'oops'])).toBe('oops'));
+  it('locates a key inside an array element', () =>
+    expect(at('trpc.a.mutate({ users: [{ name: "a" }, { oops: 1 }] })', ['users', '1', 'oops'])).toBe('oops'));
 });

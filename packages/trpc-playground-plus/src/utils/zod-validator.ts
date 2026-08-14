@@ -1,5 +1,6 @@
 import type { RouterSchema } from '../types';
 import type { TrpcCall } from './code-parser';
+import { findKeySpanAtPath, findValueSpanAtPath } from './brace-scan';
 import { discriminantLiterals, findDiscriminantKey, narrowUnionByLiteral, objectMembers } from './json-schema';
 
 export interface ValidationError {
@@ -401,53 +402,27 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
     }
   }
 
-  // Calculate the exact position of the error in the code
+  // Highlight the exact offending token by walking the full path (nested objects
+  // and array indices included). The linter uses only `start`/`end`, so line/column
+  // stay at the call's — they are not consumed downstream.
   let position = call.position;
 
   if (path.length > 0) {
-    const propertyName = path[0];
+    // Unrecognized keys → highlight the key token; value errors → highlight the value.
+    const span =
+      zodError.code === 'unrecognized_keys'
+        ? findKeySpanAtPath(call.rawCall, path)
+        : zodError.code === 'invalid_type' || zodError.code === 'invalid_enum_value' || zodError.code === 'invalid_literal'
+          ? findValueSpanAtPath(call.rawCall, path)
+          : null;
 
-    if (zodError.code === 'unrecognized_keys') {
-      // For unrecognized keys, highlight the property name
-      const propertyPattern = new RegExp(`\\b${propertyName}\\s*:`);
-      const match = propertyPattern.exec(call.rawCall);
-
-      if (match) {
-        const propertyStart = call.position.start + match.index;
-        const propertyEnd = propertyStart + propertyName.length;
-
-        position = {
-          start: propertyStart,
-          end: propertyEnd,
-          line: call.position.line,
-          column: call.position.column + match.index,
-        };
-      }
-    } else if (zodError.code === 'invalid_type') {
-      // For type errors, highlight the incorrect value
-      let propertyPattern: RegExp;
-
-      // If it's a JS expression, we need to capture it correctly (ex: "new Date()")
-      if (zodError.received === 'expression') {
-        // Pattern to capture expressions with parentheses
-        propertyPattern = new RegExp(`\\b${propertyName}\\s*:\\s*([^,}]+?)(?=\\s*[,}])`);
-      } else {
-        propertyPattern = new RegExp(`\\b${propertyName}\\s*:\\s*([^,}\\n]+)`);
-      }
-
-      const match = propertyPattern.exec(call.rawCall);
-
-      if (match) {
-        const valueStart = call.position.start + match.index + match[0].indexOf(match[1]);
-        const valueEnd = valueStart + match[1].trim().length;
-
-        position = {
-          start: valueStart,
-          end: valueEnd,
-          line: call.position.line,
-          column: call.position.column + match.index + match[0].indexOf(match[1]),
-        };
-      }
+    if (span) {
+      position = {
+        start: call.position.start + span.start,
+        end: call.position.start + span.end,
+        line: call.position.line,
+        column: call.position.column,
+      };
     }
   }
 
