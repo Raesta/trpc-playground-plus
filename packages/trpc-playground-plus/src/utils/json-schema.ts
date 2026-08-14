@@ -7,6 +7,13 @@
  * — no React, no DOM.
  */
 
+/**
+ * Path segment meaning "step into an array's item schema" (`schema.items`).
+ * `[]` can never collide with a real object key (keys are identifiers), so a
+ * descent path can freely mix object keys and array steps (`['users', ARRAY_ITEMS]`).
+ */
+export const ARRAY_ITEMS = '[]';
+
 /** Literal value of a schema that represents a single literal (const or single-value enum). */
 export function singleLiteral(prop: any): any {
   if (!prop) return undefined;
@@ -135,8 +142,12 @@ export function resolveSchemaAtPath(
 
     if (i === path.length) break; // reached the destination node
 
-    if (current.type === 'object' && current.properties) {
-      current = current.properties[path[i]];
+    const segment = path[i];
+    if (segment === ARRAY_ITEMS) {
+      if (current.type === 'array' && current.items) current = current.items;
+      else return null; // an item step on a non-array
+    } else if (current.type === 'object' && current.properties) {
+      current = current.properties[segment];
     } else {
       return null; // path goes deeper than the schema allows
     }

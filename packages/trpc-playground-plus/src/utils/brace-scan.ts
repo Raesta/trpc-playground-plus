@@ -6,6 +6,8 @@
  * `code-parser.ts` can adopt `scanBalanced` later; for now it stays independent.
  */
 
+import { ARRAY_ITEMS } from './json-schema';
+
 const IDENT = /[A-Za-z0-9_$]/;
 
 export interface ScanResult {
@@ -79,11 +81,17 @@ export function splitTopLevel(content: string): string[] {
 }
 
 export interface CursorObjectContext {
-  /** Nested object keys the cursor is inside, from the argument object down to the cursor. */
+  /**
+   * Schema-descent path from the argument object down to the cursor: nested object
+   * keys plus an `ARRAY_ITEMS` marker for each array the cursor is inside. Feed this
+   * straight to `resolveSchemaAtPath`. e.g. inside `{ users: [{ | }] }` → `['users', ARRAY_ITEMS]`.
+   */
   path: string[];
+  /** Whether the cursor sits directly in an object `{ }` or an array `[ ]`. */
+  container: 'object' | 'array';
   /** Keys already present in the innermost object scope (to avoid re-suggesting them). */
   usedKeys: Set<string>;
-  /** Inner text of the innermost object scope, up to the cursor. */
+  /** Inner text of the innermost scope, up to the cursor. */
   objectContent: string;
   /** Set when the cursor sits in a value position right after `key: `. */
   valueSlot?: { key: string; quote: string; partial: string };
@@ -100,6 +108,7 @@ export interface CursorObjectContext {
 export function findCursorObjectContext(text: string, cursorOffset: number): CursorObjectContext | null {
   interface Frame {
     key: string | null;
+    kind: 'object' | 'array';
     usedKeys: Set<string>;
     contentStart: number;
   }
@@ -144,15 +153,20 @@ export function findCursorObjectContext(text: string, cursorOffset: number): Cur
       continue;
     }
 
-    if (ch === '{') {
-      stack.push({ key: pendingKey, usedKeys: new Set(), contentStart: i + 1 });
+    if (ch === '{' || ch === '[') {
+      stack.push({
+        key: pendingKey,
+        kind: ch === '{' ? 'object' : 'array',
+        usedKeys: new Set(),
+        contentStart: i + 1,
+      });
       pendingKey = null;
       lastWord = null;
       i++;
       continue;
     }
 
-    if (ch === '}') {
+    if (ch === '}' || ch === ']') {
       stack.pop();
       pendingKey = null;
       lastWord = null;
@@ -176,17 +190,20 @@ export function findCursorObjectContext(text: string, cursorOffset: number): Cur
   if (stack.length === 0) return null;
 
   const top = stack[stack.length - 1];
-  const path = stack
-    .slice(1)
-    .map((f) => f.key)
-    .filter((k): k is string => !!k);
+  // Build the schema-descent path: each frame contributes its key (if any), and each
+  // array frame contributes an ARRAY_ITEMS step so the resolver unwraps `schema.items`.
+  const path: string[] = [];
+  for (const frame of stack.slice(1)) {
+    if (frame.key) path.push(frame.key);
+    if (frame.kind === 'array') path.push(ARRAY_ITEMS);
+  }
   const objectContent = text.slice(top.contentStart, limit);
   const valueMatch = objectContent.match(/(\w+)\s*:\s*(["']?)(\w*)$/);
   const valueSlot = valueMatch
     ? { key: valueMatch[1], quote: valueMatch[2], partial: valueMatch[3] }
     : undefined;
 
-  return { path, usedKeys: top.usedKeys, objectContent, valueSlot };
+  return { path, container: top.kind, usedKeys: top.usedKeys, objectContent, valueSlot };
 }
 
 /** A half-open `[start, end)` offset range into a source string. */

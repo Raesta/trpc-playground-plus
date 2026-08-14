@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARRAY_ITEMS,
   discriminantLiterals,
   findDiscriminantKey,
   mergeObjectSchemas,
@@ -140,5 +141,42 @@ describe('resolveSchemaAtPath', () => {
   });
   it('returns null when the path goes deeper than the schema', () => {
     expect(resolveSchemaAtPath(root, ['name', 'nope'])).toBeNull();
+  });
+
+  describe('array item steps (ARRAY_ITEMS)', () => {
+    const itemObject = { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] };
+    const arrRoot = {
+      type: 'object',
+      properties: {
+        users: { type: 'array', items: itemObject },
+        tags: { type: 'array', items: { type: 'string' } },
+        grid: { type: 'array', items: { type: 'array', items: { type: 'number' } } },
+        events: { type: 'array', items: { anyOf: members } },
+      },
+    };
+
+    it('returns the array node itself without an item step', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['users'])).toBe(arrRoot.properties.users);
+    });
+    it('unwraps to the item object schema', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['users', ARRAY_ITEMS])).toBe(itemObject);
+    });
+    it('unwraps to a primitive item schema', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['tags', ARRAY_ITEMS])).toEqual({ type: 'string' });
+    });
+    it('unwraps nested arrays (array of arrays)', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['grid', ARRAY_ITEMS, ARRAY_ITEMS])).toEqual({ type: 'number' });
+    });
+    it('narrows a union item using the lookup', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['events', ARRAY_ITEMS], () => 'email')).toBe(emailMember);
+    });
+    it('offers only the discriminant for an unresolved union item', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['events', ARRAY_ITEMS], () => undefined)).toEqual(
+        unionValueSchema(members, 'kind'),
+      );
+    });
+    it('returns null for an item step on a non-array', () => {
+      expect(resolveSchemaAtPath(arrRoot, ['users', ARRAY_ITEMS, 'name', ARRAY_ITEMS])).toBeNull();
+    });
   });
 });

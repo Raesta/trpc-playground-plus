@@ -242,11 +242,9 @@ function validateObject(data: any, schema: any, ctx: ValidationContext): RawErro
     for (const requiredProp of schema.required) {
       if (!(requiredProp in data)) {
         errors.push({
-          code: 'invalid_type',
+          code: 'missing_property',
           message: `Required property "${requiredProp}" is missing`,
           path: [...ctx.path, requiredProp],
-          expected: 'defined',
-          received: 'undefined',
         });
       }
     }
@@ -293,11 +291,9 @@ function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError
     if (!(discriminant in data)) {
       return [
         {
-          code: 'invalid_type',
+          code: 'missing_property',
           message: `Required property "${discriminant}" is missing`,
           path: [...ctx.path, discriminant],
-          expected: 'defined',
-          received: 'undefined',
         },
       ];
     }
@@ -351,7 +347,11 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
   let received: string | undefined;
 
   // Improve error messages
-  if (zodError.code === 'invalid_type') {
+  if (zodError.code === 'missing_property') {
+    // No expected/received chips: the value is simply absent. The title names the
+    // property, and the highlight points at the object that should contain it.
+    message = `Missing required property "${path[path.length - 1]}"`;
+  } else if (zodError.code === 'invalid_type') {
     expected = zodError.expected;
     if (zodError.received === 'expression' && zodError.jsExpression) {
       message = 'Type mismatch';
@@ -408,13 +408,17 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
   let position = call.position;
 
   if (path.length > 0) {
-    // Unrecognized keys → highlight the key token; value errors → highlight the value.
+    // - unrecognized key → highlight the key token
+    // - missing property → the value is absent, so highlight the containing object (parent path)
+    // - other value errors → highlight the offending value
     const span =
       zodError.code === 'unrecognized_keys'
         ? findKeySpanAtPath(call.rawCall, path)
-        : zodError.code === 'invalid_type' || zodError.code === 'invalid_enum_value' || zodError.code === 'invalid_literal'
-          ? findValueSpanAtPath(call.rawCall, path)
-          : null;
+        : zodError.code === 'missing_property'
+          ? findValueSpanAtPath(call.rawCall, path.slice(0, -1))
+          : zodError.code === 'invalid_type' || zodError.code === 'invalid_enum_value' || zodError.code === 'invalid_literal'
+            ? findValueSpanAtPath(call.rawCall, path)
+            : null;
 
     if (span) {
       position = {

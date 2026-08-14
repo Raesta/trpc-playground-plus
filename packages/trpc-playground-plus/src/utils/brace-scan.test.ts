@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ARRAY_ITEMS } from './json-schema';
 import { findCursorObjectContext, findKeySpanAtPath, findValueSpanAtPath, scanBalanced, splitTopLevel } from './brace-scan';
 
 describe('splitTopLevel', () => {
@@ -112,6 +113,56 @@ describe('findCursorObjectContext', () => {
     const ctx = findCursorObjectContext(text, text.length);
     expect(ctx?.path).toEqual(['meta']);
     expect(ctx?.valueSlot).toEqual({ key: 'role', quote: '"', partial: 'ad' });
+  });
+
+  it('reports an object container for a plain nested object', () => {
+    const text = '{ meta: {  } }';
+    const ctx = findCursorObjectContext(text, text.indexOf('{ ', 1) + 2);
+    expect(ctx?.container).toBe('object');
+  });
+
+  it('marks the cursor as inside an array (empty array literal)', () => {
+    const text = '{ tags: [  ] }';
+    const ctx = findCursorObjectContext(text, text.indexOf('[') + 2);
+    expect(ctx?.path).toEqual(['tags', ARRAY_ITEMS]);
+    expect(ctx?.container).toBe('array');
+  });
+
+  it('descends into an object element of an array', () => {
+    const text = '{ users: [{  }] }';
+    const ctx = findCursorObjectContext(text, text.indexOf('{', 1) + 1);
+    expect(ctx?.path).toEqual(['users', ARRAY_ITEMS]);
+    expect(ctx?.container).toBe('object');
+  });
+
+  it('scopes usedKeys to the current array element', () => {
+    const text = '{ users: [{ name: "a", age }] }';
+    const ctx = findCursorObjectContext(text, text.indexOf('age') + 3);
+    expect(ctx?.path).toEqual(['users', ARRAY_ITEMS]);
+    expect(ctx?.usedKeys.has('name')).toBe(true);
+    expect(ctx?.usedKeys.has('users')).toBe(false);
+  });
+
+  it('handles nested arrays (array of arrays)', () => {
+    const text = '{ grid: [[  ]] }';
+    const ctx = findCursorObjectContext(text, text.indexOf('[[') + 2);
+    expect(ctx?.path).toEqual(['grid', ARRAY_ITEMS, ARRAY_ITEMS]);
+    expect(ctx?.container).toBe('array');
+  });
+
+  it('detects a value slot inside an array element object', () => {
+    const text = '{ events: [{ type: "cl';
+    const ctx = findCursorObjectContext(text, text.length);
+    expect(ctx?.path).toEqual(['events', ARRAY_ITEMS]);
+    expect(ctx?.valueSlot).toEqual({ key: 'type', quote: '"', partial: 'cl' });
+  });
+
+  it('returns to the outer object after a closed array', () => {
+    const text = '{ tags: [1, 2],  }';
+    const ctx = findCursorObjectContext(text, text.lastIndexOf(',') + 2);
+    expect(ctx?.path).toEqual([]);
+    expect(ctx?.container).toBe('object');
+    expect(ctx?.usedKeys.has('tags')).toBe(true);
   });
 });
 

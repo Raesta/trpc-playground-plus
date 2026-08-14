@@ -96,11 +96,11 @@ describe('validateTrpcCall — object input', () => {
   it('flags a missing required property', () => {
     const res = validateTrpcCall(makeCall('create', 'mutation', { role: 'admin', active: true }), schema);
     const err = res.errors.find((e) => e.path?.[0] === 'name');
-    expect(err?.code).toBe('invalid_type');
-    // A missing required prop currently surfaces as a generic "Type mismatch"
-    // with the detail in expected/received (defined vs undefined).
-    expect(err?.expected).toBe('defined');
-    expect(err?.received).toBe('undefined');
+    expect(err?.code).toBe('missing_property');
+    expect(err?.message).toContain('name');
+    // No defined/undefined chips — the value is simply absent.
+    expect(err?.expected).toBeUndefined();
+    expect(err?.received).toBeUndefined();
   });
 
   it('flags a string/number/boolean type mismatch with expected & received', () => {
@@ -163,9 +163,8 @@ describe('validateTrpcCall — discriminated union', () => {
   it('flags a missing discriminant', () => {
     const res = validateTrpcCall(makeCall('notify', 'mutation', { to: 'a@b.co' }), schema);
     const err = res.errors.find((e) => e.path?.[0] === 'type');
-    expect(err?.code).toBe('invalid_type');
-    expect(err?.expected).toBe('defined');
-    expect(err?.received).toBe('undefined');
+    expect(err?.code).toBe('missing_property');
+    expect(err?.message).toContain('type');
   });
 
   it('flags an unknown discriminant value with the allowed set', () => {
@@ -322,7 +321,7 @@ describe('validateTrpcCall — nested objects (recursive)', () => {
 
   it('flags a missing nested required property', () => {
     const res = validateTrpcCall(makeCall('save', 'mutation', { ...valid, meta: { role: 'admin' } }), schema);
-    expect(res.errors.some((e) => e.path?.join('.') === 'meta.tag' && e.received === 'undefined')).toBe(true);
+    expect(res.errors.some((e) => e.code === 'missing_property' && e.path?.join('.') === 'meta.tag')).toBe(true);
   });
 
   it('flags an unrecognized nested key with a full path', () => {
@@ -371,7 +370,7 @@ describe('validateTrpcCall — arrays', () => {
     tagIt: { type: 'mutation', inputSchema: jsonSchema(z.object({ tags: z.array(z.string()) })) },
     addUsers: {
       type: 'mutation',
-      inputSchema: jsonSchema(z.object({ users: z.array(z.object({ name: z.string() })) })),
+      inputSchema: jsonSchema(z.object({ users: z.array(z.object({ name: z.string(), age: z.number().optional() })) })),
     },
   };
 
@@ -407,6 +406,18 @@ describe('validateTrpcCall — arrays', () => {
     expect(err).toBeDefined();
     // position offsets index directly into rawCall (call.position.start === 0).
     expect(rawCall.slice(err!.position.start, err!.position.end)).toBe('42');
+  });
+
+  it('highlights the item object missing a required field (not the whole call)', () => {
+    const rawCall = 'trpc.addUsers.mutate({ users: [{ name: "a" }, { age: 0 }] })';
+    const res = validateTrpcCall(
+      makeCall('addUsers', 'mutation', { users: [{ name: 'a' }, { age: 0 }] }, rawCall),
+      schema,
+    );
+    const err = res.errors.find((e) => e.code === 'missing_property' && e.path?.join('.') === 'users.1.name');
+    expect(err).toBeDefined();
+    expect(err!.message).toContain('name');
+    expect(rawCall.slice(err!.position.start, err!.position.end)).toBe('{ age: 0 }');
   });
 });
 

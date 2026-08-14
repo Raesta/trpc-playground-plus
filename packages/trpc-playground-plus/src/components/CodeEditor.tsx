@@ -848,8 +848,50 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               };
             }
 
-            // Resolve the schema of the object the cursor is actually in (nested-aware).
+            // Resolve the schema at the cursor (nested- and array-aware: the path
+            // carries ARRAY_ITEMS steps, so this is already the array's item schema).
             const resolvedSchema = resolveSchemaAtPath(inputSchema, cursorCtx.path, getDiscriminantValue);
+
+            // Cursor sits directly inside an array literal `[ | ]` (not yet in an item).
+            if (cursorCtx.container === 'array') {
+              // Object/union items → offer to open a new item object.
+              if (resolvedSchema?.properties) {
+                return {
+                  from,
+                  options: [
+                    {
+                      label: '{}',
+                      type: 'text',
+                      boost: 20,
+                      apply: (view, _completion, from, to) => {
+                        view.dispatch({
+                          changes: { from, to, insert: '{}' },
+                          selection: { anchor: from + 1 },
+                        });
+                      },
+                      info: 'Add array item',
+                    },
+                    ...argVariableOptions,
+                  ],
+                };
+              }
+              // Enum/const items → offer the allowed literal values directly.
+              const itemValues: any[] = [];
+              if (resolvedSchema?.const !== undefined) itemValues.push(resolvedSchema.const);
+              if (Array.isArray(resolvedSchema?.enum)) itemValues.push(...resolvedSchema.enum);
+              if (itemValues.length > 0) {
+                return {
+                  from,
+                  options: itemValues.map((v) => ({
+                    label: JSON.stringify(v),
+                    type: 'constant',
+                    boost: 100,
+                    apply: JSON.stringify(v),
+                  })),
+                };
+              }
+              return argVariableOptions.length > 0 ? { from, options: argVariableOptions } : null;
+            }
 
             if (resolvedSchema?.properties) {
               // Value slot: cursor right after `key: ` → offer that property's enum/const values.
