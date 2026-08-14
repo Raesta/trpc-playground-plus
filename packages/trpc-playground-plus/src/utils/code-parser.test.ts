@@ -58,12 +58,37 @@ describe('parseCodeForTrpcCalls — argument parsing', () => {
     expect(calls[0].args).toEqual({ items: [1, 2, 3] });
   });
 
-  it('KNOWN LIMITATION (ROADMAP §1): arrays stay strings under the manual parser', () => {
-    // The manual parser kicks in as soon as a value is a JS expression; arrays
-    // are then left as raw strings (code-parser.ts) instead of being parsed.
+  it('parses arrays even when the manual parser kicks in (JS expression present)', () => {
+    // A JS-expression value forces the manual parser; arrays must still be parsed,
+    // not left as raw strings (ROADMAP §1 — now fixed).
     const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ tags: [1, 2], when: new Date() })');
-    expect(calls[0].args.tags).toBe('[1, 2]');
+    expect(calls[0].args.tags).toEqual([1, 2]);
     expect(calls[0].args.when).toBe('__JS_EXPR__new Date()');
+  });
+
+  it('parses an array of objects (manual path)', () => {
+    const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ users: [{ name: "a" }, { name: "b" }], x: new Date() })');
+    expect(calls[0].args.users).toEqual([{ name: 'a' }, { name: 'b' }]);
+  });
+
+  it('parses nested arrays', () => {
+    const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ grid: [[1, 2], [3, 4]], x: new Date() })');
+    expect(calls[0].args.grid).toEqual([[1, 2], [3, 4]]);
+  });
+
+  it('respects commas inside array string elements', () => {
+    const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ tags: ["a, b", "c"], x: new Date() })');
+    expect(calls[0].args.tags).toEqual(['a, b', 'c']);
+  });
+
+  it('marks JS expressions inside arrays with the __JS_EXPR__ prefix', () => {
+    const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ dates: [new Date()], x: new Date() })');
+    expect(calls[0].args.dates).toEqual(['__JS_EXPR__new Date()']);
+  });
+
+  it('parses an empty array', () => {
+    const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ tags: [], x: new Date() })');
+    expect(calls[0].args.tags).toEqual([]);
   });
 });
 

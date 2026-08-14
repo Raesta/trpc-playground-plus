@@ -118,12 +118,14 @@ function validateValue(data: any, schema: any, ctx: ValidationContext): RawError
 
   if (schema.type === 'object') return validateObject(data, schema, ctx);
 
+  if (schema.type === 'array') return validateArray(data, schema, ctx);
+
   if (schema.type === 'string' || schema.type === 'number' || schema.type === 'boolean') {
     return validateScalar(data, schema, ctx);
   }
 
-  // Arrays and other constructs are not deep-validated yet (see ROADMAP §1);
-  // still honour standalone enum/const schemas.
+  // Other constructs (records, constraints, …) are not deep-validated yet
+  // (see ROADMAP §1); still honour standalone enum/const schemas.
   return validateEnumConst(data, schema, ctx);
 }
 
@@ -258,6 +260,20 @@ function validateObject(data: any, schema: any, ctx: ValidationContext): RawErro
     }
   }
 
+  return errors;
+}
+
+/** Arrays: check the container, then recurse into each item against `schema.items`. */
+function validateArray(data: any, schema: any, ctx: ValidationContext): RawError[] {
+  if (!Array.isArray(data)) {
+    return [typeMismatch('array', typeOf(data), ctx)];
+  }
+  if (!schema.items) return [];
+
+  const errors: RawError[] = [];
+  for (let i = 0; i < data.length; i++) {
+    errors.push(...validateValue(data[i], schema.items, childContext(ctx, String(i))));
+  }
   return errors;
 }
 

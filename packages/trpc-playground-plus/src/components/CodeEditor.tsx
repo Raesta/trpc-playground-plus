@@ -573,7 +573,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         .join(', ');
       return `{ ${props} }`;
     }
-    if (schema.type === 'array' && schema.items) return `${formatSchemaType(schema.items)}[]`;
+    if (schema.type === 'array' && schema.items) return `Array<${formatSchemaType(schema.items)}>`;
     return schema.type || 'unknown';
   };
 

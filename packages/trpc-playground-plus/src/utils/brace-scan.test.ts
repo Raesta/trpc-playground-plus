@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { findCursorObjectContext, scanBalanced } from './brace-scan';
+import { findCursorObjectContext, scanBalanced, splitTopLevel } from './brace-scan';
+
+describe('splitTopLevel', () => {
+  it('splits a flat list', () => {
+    expect(splitTopLevel('1, 2, 3')).toEqual(['1', '2', '3']);
+  });
+
+  it('ignores commas inside strings', () => {
+    expect(splitTopLevel('"a, b", "c"')).toEqual(['"a, b"', '"c"']);
+  });
+
+  it('ignores commas inside nested objects and arrays', () => {
+    expect(splitTopLevel('{ a: 1, b: 2 }, [3, 4], 5')).toEqual(['{ a: 1, b: 2 }', '[3, 4]', '5']);
+  });
+
+  it('ignores commas inside parentheses', () => {
+    expect(splitTopLevel('foo(1, 2), bar')).toEqual(['foo(1, 2)', 'bar']);
+  });
+
+  it('drops a trailing comma', () => {
+    expect(splitTopLevel('1, 2, ')).toEqual(['1', '2']);
+  });
+
+  it('returns an empty array for empty content', () => {
+    expect(splitTopLevel('')).toEqual([]);
+    expect(splitTopLevel('   ')).toEqual([]);
+  });
+});
 
 describe('scanBalanced', () => {
   it('scans a balanced object', () => {

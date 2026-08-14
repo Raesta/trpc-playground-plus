@@ -34,6 +34,43 @@ const postRouter = t.router({
     .mutation(({ input }) => ({ message: `Post created: ${input.title}` })),
 });
 
+// Router dedicated to exercising array parsing & validation (ROADMAP §1).
+const arrayRouter = t.router({
+  // Array of primitives: try { tags: ["a", 123] } → item 1 flagged (number vs string).
+  tags: t.procedure
+    .input(z.object({ tags: z.array(z.string()) }))
+    .output(z.object({ count: z.number() }))
+    .mutation(({ input }) => ({ count: input.tags.length })),
+
+  // Array of objects: try { users: [{ name: "a" }, { name: 42 }] } → users.1.name flagged.
+  users: t.procedure
+    .input(z.object({ users: z.array(z.object({ name: z.string(), age: z.number().optional() })) }))
+    .output(z.object({ names: z.array(z.string()) }))
+    .mutation(({ input }) => ({ names: input.users.map((u) => u.name) })),
+
+  // Nested arrays: try { grid: [[1, 2], ["x"]] } → grid.1.0 flagged.
+  grid: t.procedure
+    .input(z.object({ grid: z.array(z.array(z.number())) }))
+    .output(z.object({ rows: z.number() }))
+    .query(({ input }) => ({ rows: input.grid.length })),
+
+  // Array of a discriminated union: each item narrows on `type`.
+  // try { events: [{ type: "click", x: 1, y: 2 }, { type: "key", key: 9 }] } → events.1.key flagged.
+  events: t.procedure
+    .input(
+      z.object({
+        events: z.array(
+          z.discriminatedUnion('type', [
+            z.object({ type: z.literal('click'), x: z.number(), y: z.number() }),
+            z.object({ type: z.literal('key'), key: z.string() }),
+          ]),
+        ),
+      }),
+    )
+    .output(z.object({ handled: z.number() }))
+    .mutation(({ input }) => ({ handled: input.events.length })),
+});
+
 // Create the main router
 const appRouter = t.router({
   hello: t.procedure
@@ -119,6 +156,7 @@ const appRouter = t.router({
 
   user: userRouter,
   post: postRouter,
+  arrays: arrayRouter,
 });
 
 app.register(fastifyTRPCPlugin, {

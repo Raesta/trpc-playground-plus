@@ -42,6 +42,42 @@ export function scanBalanced(text: string, start: number, open: string, close: s
   return { end: text.length, content: text.slice(start + 1) };
 }
 
+/**
+ * Split a comma-separated list on its top-level commas only, ignoring commas that
+ * appear inside strings or nested `()`/`{}`/`[]`. Segments are trimmed and empty
+ * segments are dropped, so a trailing comma (`1, 2, `) does not produce a blank item.
+ *
+ * Used to parse array/argument literals in `code-parser.ts`.
+ */
+export function splitTopLevel(content: string): string[] {
+  const segments: string[] = [];
+  let depth = 0;
+  let inString = false;
+  let stringChar = '';
+  let start = 0;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (inString) {
+      if (ch === stringChar && content[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringChar = ch;
+    } else if (ch === '(' || ch === '{' || ch === '[') {
+      depth++;
+    } else if (ch === ')' || ch === '}' || ch === ']') {
+      depth--;
+    } else if (ch === ',' && depth === 0) {
+      segments.push(content.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  segments.push(content.slice(start).trim());
+  return segments.filter((s) => s.length > 0);
+}
+
 export interface CursorObjectContext {
   /** Nested object keys the cursor is inside, from the argument object down to the cursor. */
   path: string[];

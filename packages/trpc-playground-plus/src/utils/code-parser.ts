@@ -1,3 +1,5 @@
+import { splitTopLevel } from './brace-scan';
+
 export interface TrpcCall {
   procedure: string;
   type: 'query' | 'mutation';
@@ -129,38 +131,39 @@ function parseObjectLiteral(str: string): any {
     }
 
     const valueStr = content.slice(valueStart, i).trim();
-
-    // Try to determine the value type
-    if (valueStr.startsWith('"') || valueStr.startsWith("'")) {
-      // String
-      result[key] = valueStr.slice(1, -1);
-    } else if (valueStr === 'true') {
-      result[key] = true;
-    } else if (valueStr === 'false') {
-      result[key] = false;
-    } else if (valueStr === 'null') {
-      result[key] = null;
-    } else if (valueStr === 'undefined') {
-      result[key] = undefined;
-    } else if (!Number.isNaN(Number(valueStr))) {
-      result[key] = Number(valueStr);
-    } else if (valueStr.startsWith('{')) {
-      // Nested object
-      result[key] = parseObjectLiteral(valueStr);
-    } else if (valueStr.startsWith('[')) {
-      // Array - for now, let's leave it as a string
-      result[key] = valueStr;
-    } else {
-      // Expression JavaScript (new Date(), functiqon, etc.)
-      // Let's put a placeholder to indicate that it's a JavaScript expression
-      result[key] = `__JS_EXPR__${valueStr}`;
-    }
+    result[key] = parseValue(valueStr);
 
     // Skip comma if present
     if (content[i] === ',') i++;
   }
 
   return result;
+}
+
+/**
+ * Determine the runtime value of a single literal token (object property value or
+ * array element). Nested objects/arrays recurse; anything not recognised as a JSON
+ * literal is treated as a JavaScript expression and marked with `__JS_EXPR__`.
+ */
+function parseValue(valueStr: string): any {
+  if (valueStr.startsWith('"') || valueStr.startsWith("'")) {
+    return valueStr.slice(1, -1); // String
+  }
+  if (valueStr === 'true') return true;
+  if (valueStr === 'false') return false;
+  if (valueStr === 'null') return null;
+  if (valueStr === 'undefined') return undefined;
+  if (valueStr !== '' && !Number.isNaN(Number(valueStr))) return Number(valueStr);
+  if (valueStr.startsWith('{')) return parseObjectLiteral(valueStr);
+  if (valueStr.startsWith('[')) return parseArrayLiteral(valueStr);
+  // JavaScript expression (new Date(), a function call, a variable reference, …).
+  return `__JS_EXPR__${valueStr}`;
+}
+
+/** Parse an array literal into its elements, each resolved via `parseValue`. */
+function parseArrayLiteral(str: string): any[] {
+  const content = str.slice(1, -1).trim(); // drop the surrounding [ ]
+  return splitTopLevel(content).map(parseValue);
 }
 
 function getLineAndColumn(text: string, position: number): { line: number; column: number } {

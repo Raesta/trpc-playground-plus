@@ -366,9 +366,40 @@ describe('validateTrpcCall — nested objects (recursive)', () => {
   });
 });
 
+describe('validateTrpcCall — arrays', () => {
+  const schema: RouterSchema = {
+    tagIt: { type: 'mutation', inputSchema: jsonSchema(z.object({ tags: z.array(z.string()) })) },
+    addUsers: {
+      type: 'mutation',
+      inputSchema: jsonSchema(z.object({ users: z.array(z.object({ name: z.string() })) })),
+    },
+  };
+
+  it('accepts a valid array of primitives', () => {
+    const res = validateTrpcCall(makeCall('tagIt', 'mutation', { tags: ['a', 'b'] }), schema);
+    expect(res.isValid).toBe(true);
+  });
+
+  it('flags a wrong-typed item with its index in the path', () => {
+    const res = validateTrpcCall(makeCall('tagIt', 'mutation', { tags: ['a', 123] }), schema);
+    expect(res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags.1' && e.expected === 'string')).toBe(
+      true,
+    );
+  });
+
+  it('flags a value that should be an array but is not', () => {
+    const res = validateTrpcCall(makeCall('tagIt', 'mutation', { tags: 'nope' }), schema);
+    expect(res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags' && e.expected === 'array')).toBe(true);
+  });
+
+  it('recurses into an array of objects and reports a nested path', () => {
+    const res = validateTrpcCall(makeCall('addUsers', 'mutation', { users: [{ name: 'ok' }, { name: 42 }] }), schema);
+    expect(res.errors.some((e) => e.path?.join('.') === 'users.1.name' && e.expected === 'string')).toBe(true);
+  });
+});
+
 // --- Known gaps tracked in ROADMAP.md (§1) — pending deeper validation ---
 describe('validation gaps (ROADMAP §1)', () => {
-  it.todo('validates array items against schema.items');
   it.todo('enforces constraints (min/max, minLength/maxLength, regex, email)');
   it.todo('validates unions whose members are not objects');
 });
