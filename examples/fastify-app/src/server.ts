@@ -154,6 +154,21 @@ const appRouter = t.router({
     .output(z.object({ delivered: z.boolean() }))
     .mutation(({ input }) => ({ delivered: input.type !== 'sms' })),
 
+  // Constraint validation (min/max, length, email, regex, multipleOf, array bounds).
+  // try: trpc.constrained.mutate({ email: "x", age: 5, code: "ab", quantity: 3, tags: [] })
+  constrained: t.procedure
+    .input(
+      z.object({
+        email: z.email(),
+        age: z.number().min(18).max(120),
+        code: z.string().length(6),
+        quantity: z.number().int().multipleOf(5),
+        tags: z.array(z.string()).min(1).max(3),
+      }),
+    )
+    .output(z.object({ ok: z.boolean() }))
+    .mutation(() => ({ ok: true })),
+
   user: userRouter,
   post: postRouter,
   arrays: arrayRouter,

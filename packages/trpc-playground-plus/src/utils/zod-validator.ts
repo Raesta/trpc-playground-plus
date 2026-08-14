@@ -121,12 +121,17 @@ function validateValue(data: any, schema: any, ctx: ValidationContext): RawError
 
   if (schema.type === 'array') return validateArray(data, schema, ctx);
 
-  if (schema.type === 'string' || schema.type === 'number' || schema.type === 'boolean') {
+  if (
+    schema.type === 'string' ||
+    schema.type === 'number' ||
+    schema.type === 'integer' ||
+    schema.type === 'boolean'
+  ) {
     return validateScalar(data, schema, ctx);
   }
 
-  // Other constructs (records, constraints, …) are not deep-validated yet
-  // (see ROADMAP §1); still honour standalone enum/const schemas.
+  // Other constructs (records, …) are not deep-validated yet (see ROADMAP §1);
+  // still honour standalone enum/const schemas.
   return validateEnumConst(data, schema, ctx);
 }
 
@@ -166,13 +171,91 @@ function validateEnumConst(data: any, schema: any, ctx: ValidationContext): RawE
   return errors;
 }
 
-/** string / number / boolean primitives (+ any enum/const on them). */
+/** Build a constraint-violation error (no expected/received chips: title-only). */
+function constraint(ctx: ValidationContext, message: string): RawError {
+  return { code: 'invalid_constraint', message, path: ctx.path };
+}
+
+/** Human label for a JSON Schema string `format` (used in constraint messages). */
+function formatLabel(format: string | undefined): string | null {
+  if (!format) return null;
+  const labels: Record<string, string> = {
+    email: 'email',
+    uuid: 'UUID',
+    uri: 'URL',
+    'date-time': 'date-time',
+    date: 'date',
+    time: 'time',
+    duration: 'duration',
+  };
+  return labels[format] ?? format;
+}
+
+/** String constraints: length bounds and pattern/format. */
+function stringConstraints(value: string, schema: any, ctx: ValidationContext): RawError[] {
+  const errors: RawError[] = [];
+  if (typeof schema.minLength === 'number' && value.length < schema.minLength) {
+    errors.push(constraint(ctx, `Too short: expected at least ${schema.minLength} character(s), but received ${value.length}`));
+  }
+  if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) {
+    errors.push(constraint(ctx, `Too long: expected at most ${schema.maxLength} character(s), but received ${value.length}`));
+  }
+  // `pattern` encodes email/uuid/regex/date-time/… (some formats like `uri` have none).
+  if (typeof schema.pattern === 'string') {
+    let re: RegExp | null = null;
+    try {
+      re = new RegExp(schema.pattern);
+    } catch {
+      re = null;
+    }
+    if (re && !re.test(value)) {
+      const label = formatLabel(schema.format);
+      errors.push(constraint(ctx, label ? `Invalid ${label}` : 'Does not match the required pattern'));
+    }
+  }
+  return errors;
+}
+
+/** Number constraints: inclusive/exclusive bounds and multipleOf. */
+function numberConstraints(value: number, schema: any, ctx: ValidationContext): RawError[] {
+  const errors: RawError[] = [];
+  if (typeof schema.minimum === 'number' && value < schema.minimum) {
+    errors.push(constraint(ctx, `Too small: expected ≥ ${schema.minimum}, but received ${value}`));
+  }
+  if (typeof schema.maximum === 'number' && value > schema.maximum) {
+    errors.push(constraint(ctx, `Too large: expected ≤ ${schema.maximum}, but received ${value}`));
+  }
+  if (typeof schema.exclusiveMinimum === 'number' && value <= schema.exclusiveMinimum) {
+    errors.push(constraint(ctx, `Too small: expected > ${schema.exclusiveMinimum}, but received ${value}`));
+  }
+  if (typeof schema.exclusiveMaximum === 'number' && value >= schema.exclusiveMaximum) {
+    errors.push(constraint(ctx, `Too large: expected < ${schema.exclusiveMaximum}, but received ${value}`));
+  }
+  if (typeof schema.multipleOf === 'number' && value % schema.multipleOf !== 0) {
+    errors.push(constraint(ctx, `Expected a multiple of ${schema.multipleOf}, but received ${value}`));
+  }
+  return errors;
+}
+
+/** string / number / integer / boolean primitives (+ constraints and any enum/const). */
 function validateScalar(data: any, schema: any, ctx: ValidationContext): RawError[] {
   const errors: RawError[] = [];
-  const expected = schema.type;
-  if (expected && typeof data !== expected) {
-    errors.push(typeMismatch(expected, typeOf(data), ctx));
+  const base = schema.type === 'integer' ? 'number' : schema.type;
+  const typeOk = base ? typeOf(data) === base : true;
+
+  if (base && !typeOk) {
+    errors.push(typeMismatch(schema.type, typeOf(data), ctx));
   }
+
+  // Constraints only make sense once the base type matches.
+  if (typeOk) {
+    if (schema.type === 'integer' && !Number.isInteger(data)) {
+      errors.push(constraint(ctx, `Expected an integer, but received ${JSON.stringify(data)}`));
+    }
+    if (base === 'string') errors.push(...stringConstraints(data, schema, ctx));
+    if (base === 'number') errors.push(...numberConstraints(data, schema, ctx));
+  }
+
   errors.push(...validateEnumConst(data, schema, ctx));
   return errors;
 }
@@ -262,16 +345,24 @@ function validateObject(data: any, schema: any, ctx: ValidationContext): RawErro
   return errors;
 }
 
-/** Arrays: check the container, then recurse into each item against `schema.items`. */
+/** Arrays: check the container, length constraints, then recurse into each item. */
 function validateArray(data: any, schema: any, ctx: ValidationContext): RawError[] {
   if (!Array.isArray(data)) {
     return [typeMismatch('array', typeOf(data), ctx)];
   }
-  if (!schema.items) return [];
 
   const errors: RawError[] = [];
-  for (let i = 0; i < data.length; i++) {
-    errors.push(...validateValue(data[i], schema.items, childContext(ctx, String(i))));
+  if (typeof schema.minItems === 'number' && data.length < schema.minItems) {
+    errors.push(constraint(ctx, `Too few items: expected at least ${schema.minItems}, but received ${data.length}`));
+  }
+  if (typeof schema.maxItems === 'number' && data.length > schema.maxItems) {
+    errors.push(constraint(ctx, `Too many items: expected at most ${schema.maxItems}, but received ${data.length}`));
+  }
+
+  if (schema.items) {
+    for (let i = 0; i < data.length; i++) {
+      errors.push(...validateValue(data[i], schema.items, childContext(ctx, String(i))));
+    }
   }
   return errors;
 }
@@ -368,15 +459,9 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
     message = 'Invalid literal';
     expected = zodError.expected;
     received = zodError.received;
-  } else if (zodError.code === 'too_small') {
-    message = `Value is too small. Minimum is ${zodError.minimum}`;
-  } else if (zodError.code === 'too_big') {
-    message = `Value is too large. Maximum is ${zodError.maximum}`;
-  } else if (zodError.code === 'invalid_string') {
-    message = `Invalid string format`;
-    if (zodError.validation) {
-      message += `: ${zodError.validation}`;
-    }
+  } else if (zodError.code === 'invalid_constraint') {
+    // Message is already fully built by the validator (length/range/pattern/items).
+    // No chips — the title is self-contained.
   } else if (zodError.code === 'unrecognized_keys') {
     message = `Unrecognized key: "${path[0]}"`;
 
@@ -416,7 +501,10 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
         ? findKeySpanAtPath(call.rawCall, path)
         : zodError.code === 'missing_property'
           ? findValueSpanAtPath(call.rawCall, path.slice(0, -1))
-          : zodError.code === 'invalid_type' || zodError.code === 'invalid_enum_value' || zodError.code === 'invalid_literal'
+          : zodError.code === 'invalid_type' ||
+            zodError.code === 'invalid_enum_value' ||
+            zodError.code === 'invalid_literal' ||
+            zodError.code === 'invalid_constraint'
             ? findValueSpanAtPath(call.rawCall, path)
             : null;
 

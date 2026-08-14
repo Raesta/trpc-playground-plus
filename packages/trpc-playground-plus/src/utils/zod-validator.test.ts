@@ -421,8 +421,94 @@ describe('validateTrpcCall — arrays', () => {
   });
 });
 
+describe('validateTrpcCall — constraints', () => {
+  const schema: RouterSchema = {
+    signup: {
+      type: 'mutation',
+      inputSchema: jsonSchema(
+        z.object({
+          email: z.email(),
+          handle: z.string().min(3).max(8),
+          slug: z.string().regex(/^[a-z]+$/),
+          age: z.number().min(18).max(120),
+          count: z.number().int(),
+          step: z.number().multipleOf(5),
+          tags: z.array(z.string()).min(1).max(3),
+        }),
+      ),
+    },
+  };
+  const valid = {
+    email: 'a@b.co',
+    handle: 'jdoe',
+    slug: 'abc',
+    age: 30,
+    count: 4,
+    step: 10,
+    tags: ['x'],
+  };
+  const call = (over: Record<string, any>, rawCall?: string) =>
+    validateTrpcCall(makeCall('signup', 'mutation', { ...valid, ...over }, rawCall), schema);
+  const codeOf = (over: Record<string, any>, prop: string) =>
+    call(over).errors.find((e) => e.path?.join('.') === prop)?.code;
+
+  it('accepts a fully valid input', () => {
+    expect(call({}).isValid).toBe(true);
+  });
+
+  it('flags a string shorter than minLength', () => {
+    expect(codeOf({ handle: 'ab' }, 'handle')).toBe('invalid_constraint');
+  });
+  it('flags a string longer than maxLength', () => {
+    expect(codeOf({ handle: 'abcdefghij' }, 'handle')).toBe('invalid_constraint');
+  });
+  it('flags an invalid email via its pattern', () => {
+    const err = call({ email: 'nope' }).errors.find((e) => e.path?.join('.') === 'email');
+    expect(err?.code).toBe('invalid_constraint');
+    expect(err?.message).toContain('email');
+  });
+  it('flags a value not matching a regex pattern', () => {
+    expect(codeOf({ slug: 'ABC' }, 'slug')).toBe('invalid_constraint');
+  });
+
+  it('flags a number below the minimum', () => {
+    expect(codeOf({ age: 5 }, 'age')).toBe('invalid_constraint');
+  });
+  it('flags a number above the maximum', () => {
+    expect(codeOf({ age: 999 }, 'age')).toBe('invalid_constraint');
+  });
+  it('flags a non-multiple', () => {
+    expect(codeOf({ step: 7 }, 'step')).toBe('invalid_constraint');
+  });
+  it('flags a non-integer for an integer schema', () => {
+    const err = call({ count: 3.5 }).errors.find((e) => e.path?.join('.') === 'count');
+    expect(err?.code).toBe('invalid_constraint');
+    expect(err?.message).toContain('integer');
+  });
+
+  it('flags too few array items', () => {
+    expect(codeOf({ tags: [] }, 'tags')).toBe('invalid_constraint');
+  });
+  it('flags too many array items', () => {
+    expect(codeOf({ tags: ['a', 'b', 'c', 'd'] }, 'tags')).toBe('invalid_constraint');
+  });
+
+  it('does not apply string constraints to a JS expression value', () => {
+    // `__JS_EXPR__` values are routed away from scalar validation, so length/pattern
+    // checks never run — even though the raw placeholder is longer than maxLength.
+    const res = call({ handle: '__JS_EXPR__someVeryLongExpression()' });
+    expect(res.errors.some((e) => e.path?.join('.') === 'handle' && e.code === 'invalid_constraint')).toBe(false);
+  });
+
+  it('highlights the offending value for a constraint violation', () => {
+    const rawCall = 'trpc.signup.mutate({ email: "a@b.co", handle: "abcdefghij", slug: "abc", age: 30, count: 4, step: 10, tags: ["x"] })';
+    const err = call({ handle: 'abcdefghij' }, rawCall).errors.find((e) => e.path?.join('.') === 'handle');
+    expect(err).toBeDefined();
+    expect(rawCall.slice(err!.position.start, err!.position.end)).toBe('"abcdefghij"');
+  });
+});
+
 // --- Known gaps tracked in ROADMAP.md (§1) — pending deeper validation ---
 describe('validation gaps (ROADMAP §1)', () => {
-  it.todo('enforces constraints (min/max, minLength/maxLength, regex, email)');
   it.todo('validates unions whose members are not objects');
 });
