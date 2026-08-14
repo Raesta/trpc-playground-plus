@@ -115,7 +115,11 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({ value, onChange, isLoadi
 
   return (
     <div style={styles.container}>
-      <EditorToolbar editorRef={editorRef} leftContent={callInfo ? <CallInfoInline info={callInfo} /> : null} />
+      <EditorToolbar
+        editorRef={editorRef}
+        showCopy
+        leftContent={callInfo ? <CallInfoInline info={callInfo} /> : null}
+      />
       {isLoading && (
         <div style={styles.loadingOverlay}>
           <Spinner />

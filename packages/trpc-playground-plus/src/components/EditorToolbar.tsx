@@ -1,7 +1,7 @@
 import { foldable, foldEffect, unfoldAll } from '@codemirror/language';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import type React from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../ThemeContext';
 
 interface EditorToolbarProps {
@@ -9,6 +9,8 @@ interface EditorToolbarProps {
   onTabDrawerClick?: () => void;
   tabDrawerErrors?: string[];
   onFormat?: () => void;
+  /** Show a "copy to clipboard" button that copies the editor's full content. */
+  showCopy?: boolean;
   leftContent?: React.ReactNode;
   children?: React.ReactNode;
 }
@@ -84,11 +86,43 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onTabDrawerClick,
   tabDrawerErrors,
   onFormat,
+  showCopy,
   leftContent,
   children,
 }) => {
   const theme = useTheme();
   const getView = useCallback(() => editorRef.current?.view ?? null, [editorRef]);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = useCallback(async () => {
+    const text = getView()?.state.doc.toString() ?? '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      // Fallback for non-secure contexts where the async Clipboard API is unavailable.
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopied(true);
+      } catch {
+        // Give up silently — nothing we can do without clipboard access.
+      }
+    }
+  }, [getView]);
 
   const styles = useMemo(
     () => ({
@@ -191,6 +225,38 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {showCopy && (
+          <ToolbarButton title={copied ? 'Copied!' : 'Copy to clipboard'} onClick={handleCopy} variant="pill">
+            {copied ? (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={theme.colors.accent.play}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+          </ToolbarButton>
+        )}
         {onFormat && (
           <ToolbarButton title="Format code (Shift+Alt+F)" onClick={onFormat} variant="pill">
             <svg
