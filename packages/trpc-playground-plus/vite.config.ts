@@ -13,10 +13,12 @@ export default defineConfig({
       // One entry (bundle) per adapter, kept flat in `dist/` so each adapter can
       // resolve `./app` relative to its own bundle. Add new adapters here.
       entry: {
-        fastify: resolve(__dirname, 'src/adapters/fastify.ts'),
+        fastify: resolve(import.meta.dirname, 'src/adapters/fastify.ts'),
       },
       name: 'TRPCPlaygroundPlus',
-      fileName: (format, entryName) => `${entryName}.${format}.js`,
+      // CJS must use a real `.cjs` extension: the package is `type: module`, so a `.js`
+      // file is loaded as ESM by Node and the CommonJS `exports.x = …` would populate nothing.
+      fileName: (format, entryName) => (format === 'cjs' ? `${entryName}.cjs` : `${entryName}.es.js`),
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
@@ -30,6 +32,13 @@ export default defineConfig({
         'node:url',
         '@fastify/static',
       ],
+      onwarn(warning, defaultHandler) {
+        // The adapter uses `import.meta.url` (valid in the ESM bundle). In the CJS bundle
+        // Rolldown replaces it with `{}` and `resolveDistAppPath` falls back to `__dirname` —
+        // this is intended, so silence the cosmetic EMPTY_IMPORT_META warning.
+        if (warning.code === 'EMPTY_IMPORT_META') return;
+        defaultHandler(warning);
+      },
     },
     outDir: 'dist',
     emptyOutDir: true,

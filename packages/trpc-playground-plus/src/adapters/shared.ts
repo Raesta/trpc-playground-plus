@@ -155,12 +155,16 @@ export function toEnvVariables(envVariables?: Record<string, unknown>) {
 
 /**
  * Resolve the built playground app directory relative to the adapter bundle.
- * Each adapter is bundled flat into `dist/` (e.g. `dist/fastify.es.js`), and this
- * module is inlined into it, so `import.meta.url` points at that bundle → `./app`
+ * Each adapter is bundled flat into `dist/` (e.g. `dist/fastify.es.js`), so `./app`
  * resolves to `dist/app`.
+ *
+ * In the ESM bundle `import.meta.url` points at the bundle. In the CJS bundle the
+ * bundler replaces `import.meta` with `{}` (so `importMetaUrl` is undefined) — there
+ * we fall back to CommonJS `__dirname`, which is native and never evaluated in ESM.
  */
 export function resolveDistAppPath(importMetaUrl: string): string {
-  return path.resolve(path.dirname(fileURLToPath(importMetaUrl)), './app');
+  const dir = importMetaUrl ? path.dirname(fileURLToPath(importMetaUrl)) : __dirname;
+  return path.resolve(dir, './app');
 }
 
 /** Read the playground `index.html` and rewrite the app.js script to the mounted endpoint. */

@@ -9,7 +9,10 @@ export default defineConfig({
     {
       name: 'copy-html',
       closeBundle() {
-        fs.copyFileSync(resolve(__dirname, 'index.html'), resolve(__dirname, 'dist/app/index.html'));
+        fs.copyFileSync(
+          resolve(import.meta.dirname, 'index.html'),
+          resolve(import.meta.dirname, 'dist/app/index.html'),
+        );
       },
     },
   ],
@@ -17,7 +20,7 @@ export default defineConfig({
     outDir: 'dist/app',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(__dirname, 'src/main.tsx'),
+      input: resolve(import.meta.dirname, 'src/main.tsx'),
       output: {
         entryFileNames: 'app.js',
         assetFileNames: '[name].[ext]',
