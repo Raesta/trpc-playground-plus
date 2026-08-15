@@ -5,16 +5,18 @@ import dts from 'vite-plugin-dts';
 export default defineConfig({
   plugins: [
     dts({
-      insertTypesEntry: true,
-      rollupTypes: true,
       exclude: ['**/*.test.ts'],
     }),
   ],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      // One entry (bundle) per adapter, kept flat in `dist/` so each adapter can
+      // resolve `./app` relative to its own bundle. Add new adapters here.
+      entry: {
+        fastify: resolve(__dirname, 'src/adapters/fastify.ts'),
+      },
       name: 'TRPCPlaygroundPlus',
-      fileName: (format) => `index.${format}.js`,
+      fileName: (format, entryName) => `${entryName}.${format}.js`,
       formats: ['es', 'cjs'],
     },
     rollupOptions: {

@@ -1,7 +1,7 @@
 import { initTRPC } from '@trpc/server';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import fastify from 'fastify';
-import { createFastifyAdapter } from 'trpc-playground-plus';
+import { createFastifyAdapter } from 'trpc-playground-plus/adapters/fastify';
 import { z } from 'zod';
 import trpcPlaygroundTabs from './trpc-playground-tabs.json';
 
