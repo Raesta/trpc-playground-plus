@@ -1,6 +1,6 @@
 import type { RouterSchema } from '../types';
-import type { TrpcCall } from './code-parser';
 import { findKeySpanAtPath, findValueSpanAtPath } from './brace-scan';
+import type { TrpcCall } from './code-parser';
 import { discriminantLiterals, findDiscriminantKey, narrowUnionByLiteral, objectMembers } from './json-schema';
 
 export interface ValidationError {
@@ -196,10 +196,14 @@ function formatLabel(format: string | undefined): string | null {
 function stringConstraints(value: string, schema: any, ctx: ValidationContext): RawError[] {
   const errors: RawError[] = [];
   if (typeof schema.minLength === 'number' && value.length < schema.minLength) {
-    errors.push(constraint(ctx, `Too short: expected at least ${schema.minLength} character(s), but received ${value.length}`));
+    errors.push(
+      constraint(ctx, `Too short: expected at least ${schema.minLength} character(s), but received ${value.length}`),
+    );
   }
   if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) {
-    errors.push(constraint(ctx, `Too long: expected at most ${schema.maxLength} character(s), but received ${value.length}`));
+    errors.push(
+      constraint(ctx, `Too long: expected at most ${schema.maxLength} character(s), but received ${value.length}`),
+    );
   }
   // `pattern` encodes email/uuid/regex/date-time/… (some formats like `uri` have none).
   if (typeof schema.pattern === 'string') {
@@ -405,7 +409,9 @@ function validateUnion(data: any, schema: any, ctx: ValidationContext): RawError
 
       const chosen = narrowUnionByLiteral(objMembers, discriminant, discValue);
       if (!chosen) {
-        const allowed = discriminantLiterals(objMembers, discriminant).map((v) => JSON.stringify(v)).join(' | ');
+        const allowed = discriminantLiterals(objMembers, discriminant)
+          .map((v) => JSON.stringify(v))
+          .join(' | ');
         return [
           {
             code: 'invalid_enum_value',
@@ -518,9 +524,9 @@ function formatZodError(zodError: any, call: TrpcCall): ValidationError {
         : zodError.code === 'missing_property'
           ? findValueSpanAtPath(call.rawCall, path.slice(0, -1))
           : zodError.code === 'invalid_type' ||
-            zodError.code === 'invalid_enum_value' ||
-            zodError.code === 'invalid_literal' ||
-            zodError.code === 'invalid_constraint'
+              zodError.code === 'invalid_enum_value' ||
+              zodError.code === 'invalid_literal' ||
+              zodError.code === 'invalid_constraint'
             ? findValueSpanAtPath(call.rawCall, path)
             : null;
 

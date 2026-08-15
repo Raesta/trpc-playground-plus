@@ -89,12 +89,7 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ value, onChang
           {capturing ? 'Press a combination…' : formatKeyString(value) || 'Unset'}
         </button>
         {defaultValue !== undefined && value !== defaultValue && (
-          <button
-            type="button"
-            style={styles.reset}
-            onClick={() => onChange(defaultValue)}
-            title="Reset to default"
-          >
+          <button type="button" style={styles.reset} onClick={() => onChange(defaultValue)} title="Reset to default">
             ↺
           </button>
         )}

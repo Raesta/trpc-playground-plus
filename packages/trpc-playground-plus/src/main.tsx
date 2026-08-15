@@ -535,7 +535,14 @@ const Playground = () => {
       <Settings
         open={settingsOpen}
         setOpen={setSettingsOpen}
-        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout, keybindings, historySize }}
+        settings={{
+          splitPosition,
+          fontSize,
+          theme: loadSettings(config?.projectKey).theme,
+          requestTimeout,
+          keybindings,
+          historySize,
+        }}
         onSettingsChange={handleSettingsChange}
       />
       <div style={{ padding: 10, fontFamily: theme.font.sans }}>

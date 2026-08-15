@@ -142,11 +142,7 @@ export type DiscriminantLookup = (members: any[], key: string, atPath: string[])
  * of the typed text. This is the single shared descent that keeps nested
  * validation and nested completion in lock-step.
  */
-export function resolveSchemaAtPath(
-  root: any,
-  path: string[],
-  getDiscriminantValue?: DiscriminantLookup,
-): any | null {
+export function resolveSchemaAtPath(root: any, path: string[], getDiscriminantValue?: DiscriminantLookup): any | null {
   let current = root;
   for (let i = 0; i <= path.length; i++) {
     if (!current) return null;

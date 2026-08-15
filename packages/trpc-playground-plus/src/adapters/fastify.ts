@@ -1,7 +1,7 @@
 import fastifyStatic from '@fastify/static';
 import type { AnyTRPCRouter } from '@trpc/server';
 import type { FastifyInstance } from 'fastify';
-import { type ExportData, buildConfigPayload, renderPlaygroundHtml, resolveDistAppPath } from './shared';
+import { buildConfigPayload, type ExportData, renderPlaygroundHtml, resolveDistAppPath } from './shared';
 
 const distAppPath = resolveDistAppPath(import.meta.url);
 

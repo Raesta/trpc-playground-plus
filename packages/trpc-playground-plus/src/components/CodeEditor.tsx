@@ -519,56 +519,59 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     [theme],
   );
 
-  const createTrpcLinter = React.useCallback((schema: RouterSchema, variables: Variable[]) => {
-    const variableTypes = new Map(
-      variables
-        .filter((value) => value.enabled && value.key.trim())
-        .map((value) => [value.key.trim(), resolveVariableType(value.value)] as const),
-    );
+  const createTrpcLinter = React.useCallback(
+    (schema: RouterSchema, variables: Variable[]) => {
+      const variableTypes = new Map(
+        variables
+          .filter((value) => value.enabled && value.key.trim())
+          .map((value) => [value.key.trim(), resolveVariableType(value.value)] as const),
+      );
 
-    return linter((view) => {
-      const code = view.state.doc.toString();
-      const parseResult = parseCodeForTrpcCalls(code);
-      const diagnostics: Diagnostic[] = [];
+      return linter((view) => {
+        const code = view.state.doc.toString();
+        const parseResult = parseCodeForTrpcCalls(code);
+        const diagnostics: Diagnostic[] = [];
 
-      for (const parseError of parseResult.errors) {
-        diagnostics.push({
-          from: parseError.position.start,
-          to: parseError.position.end,
-          severity: 'error',
-          message: parseError.message,
-        });
-      }
-
-      if (parseResult.calls.length > 0) {
-        const validationResult = validateCodeWithCache(code, parseResult.calls, schema, variableTypes);
-
-        for (const error of validationResult.errors) {
+        for (const parseError of parseResult.errors) {
           diagnostics.push({
-            from: error.position.start,
-            to: error.position.end,
+            from: parseError.position.start,
+            to: parseError.position.end,
             severity: 'error',
-            message: error.message,
-            source: 'tRPC Type Check',
-            renderMessage: () => createDiagnosticNode(error, theme),
+            message: parseError.message,
           });
         }
 
-        for (const warning of validationResult.warnings) {
-          diagnostics.push({
-            from: warning.position.start,
-            to: warning.position.end,
-            severity: 'warning',
-            message: warning.message,
-            source: 'tRPC Type Check',
-            renderMessage: () => createDiagnosticNode(warning, theme),
-          });
-        }
-      }
+        if (parseResult.calls.length > 0) {
+          const validationResult = validateCodeWithCache(code, parseResult.calls, schema, variableTypes);
 
-      return diagnostics;
-    });
-  }, [theme]);
+          for (const error of validationResult.errors) {
+            diagnostics.push({
+              from: error.position.start,
+              to: error.position.end,
+              severity: 'error',
+              message: error.message,
+              source: 'tRPC Type Check',
+              renderMessage: () => createDiagnosticNode(error, theme),
+            });
+          }
+
+          for (const warning of validationResult.warnings) {
+            diagnostics.push({
+              from: warning.position.start,
+              to: warning.position.end,
+              severity: 'warning',
+              message: warning.message,
+              source: 'tRPC Type Check',
+              renderMessage: () => createDiagnosticNode(warning, theme),
+            });
+          }
+        }
+
+        return diagnostics;
+      });
+    },
+    [theme],
+  );
 
   const trpcLinterExtension = React.useMemo(
     () => createTrpcLinter(schema, variables),
@@ -1178,10 +1181,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           preventDefault: true,
           run: (view) => {
             if (!onPlayRequest) return false;
-            const target = pickCallAtCursor(
-              findTrpcCalls(view.state.doc.toString()),
-              view.state.selection.main.head,
-            );
+            const target = pickCallAtCursor(findTrpcCalls(view.state.doc.toString()), view.state.selection.main.head);
             if (!target) return false;
             onPlayRequest(target.code, { from: target.start, to: target.end });
             return true;

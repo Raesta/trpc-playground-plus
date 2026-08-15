@@ -1,5 +1,5 @@
-import { json } from '@codemirror/lang-json';
 import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
 import { MergeView } from '@codemirror/merge';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -76,11 +76,29 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
       }}
     >
       {copied ? (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={theme.colors.accent.play} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={theme.colors.accent.play}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       ) : (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
@@ -141,7 +159,10 @@ const ReadOnlyBlock: React.FC<{ value: string; lang: 'json' | 'js'; fontSize?: n
   const theme = useTheme();
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
-  const ext = useMemo(() => [lang === 'json' ? json() : javascript({ typescript: true }), editorTheme], [lang, editorTheme]);
+  const ext = useMemo(
+    () => [lang === 'json' ? json() : javascript({ typescript: true }), editorTheme],
+    [lang, editorTheme],
+  );
   return (
     <CodeMirror
       value={value}
@@ -188,7 +209,15 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ mode, entry, current
       >
         actuelle {current ? `· ${current.procedure}` : ''}
       </div>
-      <div style={{ flex: 1, padding: '4px 12px', fontSize: theme.font.size.xs, fontWeight: 600, color: theme.colors.text.secondary }}>
+      <div
+        style={{
+          flex: 1,
+          padding: '4px 12px',
+          fontSize: theme.font.size.xs,
+          fontWeight: 600,
+          color: theme.colors.text.secondary,
+        }}
+      >
         historique · {entry.procedure}
       </div>
     </div>

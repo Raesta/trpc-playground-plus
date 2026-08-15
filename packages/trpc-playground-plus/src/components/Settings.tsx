@@ -219,7 +219,10 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                 max={HISTORY_SIZE_MAX}
                 value={settings.historySize}
                 onChange={(e) => {
-                  const n = Math.min(HISTORY_SIZE_MAX, Math.max(HISTORY_SIZE_MIN, Number(e.target.value) || HISTORY_SIZE_MIN));
+                  const n = Math.min(
+                    HISTORY_SIZE_MAX,
+                    Math.max(HISTORY_SIZE_MIN, Number(e.target.value) || HISTORY_SIZE_MIN),
+                  );
                   onSettingsChange({ historySize: n });
                 }}
                 style={selectStyle}

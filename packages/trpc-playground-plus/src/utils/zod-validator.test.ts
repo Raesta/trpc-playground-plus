@@ -78,10 +78,7 @@ describe('validateTrpcCall — object input', () => {
   };
 
   it('accepts a valid object', () => {
-    const res = validateTrpcCall(
-      makeCall('create', 'mutation', { name: 'Jo', role: 'admin', active: true }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('create', 'mutation', { name: 'Jo', role: 'admin', active: true }), schema);
     expect(res.isValid).toBe(true);
   });
 
@@ -104,10 +101,7 @@ describe('validateTrpcCall — object input', () => {
   });
 
   it('flags a string/number/boolean type mismatch with expected & received', () => {
-    const res = validateTrpcCall(
-      makeCall('create', 'mutation', { name: 123, role: 'admin', active: 'yes' }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('create', 'mutation', { name: 123, role: 'admin', active: 'yes' }), schema);
     const nameErr = res.errors.find((e) => e.path?.[0] === 'name');
     expect(nameErr?.code).toBe('invalid_type');
     expect(nameErr?.expected).toBe('string');
@@ -127,10 +121,7 @@ describe('validateTrpcCall — object input', () => {
   });
 
   it('flags an invalid enum value', () => {
-    const res = validateTrpcCall(
-      makeCall('create', 'mutation', { name: 'Jo', role: 'ghost', active: true }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('create', 'mutation', { name: 'Jo', role: 'ghost', active: true }), schema);
     const err = res.errors.find((e) => e.path?.[0] === 'role');
     expect(err?.code).toBe('invalid_enum_value');
     expect(err?.expected).toContain('"admin"');
@@ -225,10 +216,7 @@ describe('validateTrpcCall — variables', () => {
   });
 
   it('reports an unknown property JS-expression as received "expression"', () => {
-    const res = validateTrpcCall(
-      makeCall('create', 'mutation', { age: '__JS_EXPR__computeAge()' }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('create', 'mutation', { age: '__JS_EXPR__computeAge()' }), schema);
     const err = res.errors.find((e) => e.path?.[0] === 'age');
     expect(err?.code).toBe('invalid_type');
     // received is the raw expression once formatted for display
@@ -325,10 +313,7 @@ describe('validateTrpcCall — nested objects (recursive)', () => {
   });
 
   it('flags an unrecognized nested key with a full path', () => {
-    const res = validateTrpcCall(
-      makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, oops: 1 } }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('save', 'mutation', { ...valid, meta: { ...valid.meta, oops: 1 } }), schema);
     expect(res.errors.some((e) => e.code === 'unrecognized_keys' && e.path?.join('.') === 'meta.oops')).toBe(true);
   });
 
@@ -357,10 +342,7 @@ describe('validateTrpcCall — nested objects (recursive)', () => {
   });
 
   it('flags an invalid discriminant value on a nested union', () => {
-    const res = validateTrpcCall(
-      makeCall('save', 'mutation', { ...valid, config: { kind: 'z' } }),
-      schema,
-    );
+    const res = validateTrpcCall(makeCall('save', 'mutation', { ...valid, config: { kind: 'z' } }), schema);
     expect(res.errors.some((e) => e.code === 'invalid_enum_value' && e.path?.join('.') === 'config.kind')).toBe(true);
   });
 });
@@ -381,14 +363,16 @@ describe('validateTrpcCall — arrays', () => {
 
   it('flags a wrong-typed item with its index in the path', () => {
     const res = validateTrpcCall(makeCall('tagIt', 'mutation', { tags: ['a', 123] }), schema);
-    expect(res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags.1' && e.expected === 'string')).toBe(
-      true,
-    );
+    expect(
+      res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags.1' && e.expected === 'string'),
+    ).toBe(true);
   });
 
   it('flags a value that should be an array but is not', () => {
     const res = validateTrpcCall(makeCall('tagIt', 'mutation', { tags: 'nope' }), schema);
-    expect(res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags' && e.expected === 'array')).toBe(true);
+    expect(
+      res.errors.some((e) => e.code === 'invalid_type' && e.path?.join('.') === 'tags' && e.expected === 'array'),
+    ).toBe(true);
   });
 
   it('recurses into an array of objects and reports a nested path', () => {
@@ -501,7 +485,8 @@ describe('validateTrpcCall — constraints', () => {
   });
 
   it('highlights the offending value for a constraint violation', () => {
-    const rawCall = 'trpc.signup.mutate({ email: "a@b.co", handle: "abcdefghij", slug: "abc", age: 30, count: 4, step: 10, tags: ["x"] })';
+    const rawCall =
+      'trpc.signup.mutate({ email: "a@b.co", handle: "abcdefghij", slug: "abc", age: 30, count: 4, step: 10, tags: ["x"] })';
     const err = call({ handle: 'abcdefghij' }, rawCall).errors.find((e) => e.path?.join('.') === 'handle');
     expect(err).toBeDefined();
     expect(rawCall.slice(err!.position.start, err!.position.end)).toBe('"abcdefghij"');

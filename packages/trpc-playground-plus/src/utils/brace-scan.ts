@@ -199,9 +199,7 @@ export function findCursorObjectContext(text: string, cursorOffset: number): Cur
   }
   const objectContent = text.slice(top.contentStart, limit);
   const valueMatch = objectContent.match(/(\w+)\s*:\s*(["']?)(\w*)$/);
-  const valueSlot = valueMatch
-    ? { key: valueMatch[1], quote: valueMatch[2], partial: valueMatch[3] }
-    : undefined;
+  const valueSlot = valueMatch ? { key: valueMatch[1], quote: valueMatch[2], partial: valueMatch[3] } : undefined;
 
   return { path, container: top.kind, usedKeys: top.usedKeys, objectContent, valueSlot };
 }

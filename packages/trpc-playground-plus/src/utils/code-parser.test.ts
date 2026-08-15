@@ -73,7 +73,10 @@ describe('parseCodeForTrpcCalls — argument parsing', () => {
 
   it('parses nested arrays', () => {
     const { calls } = parseCodeForTrpcCalls('trpc.a.mutate({ grid: [[1, 2], [3, 4]], x: new Date() })');
-    expect(calls[0].args.grid).toEqual([[1, 2], [3, 4]]);
+    expect(calls[0].args.grid).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
   });
 
   it('respects commas inside array string elements', () => {

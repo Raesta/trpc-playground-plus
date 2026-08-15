@@ -150,8 +150,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
           </div>
         ) : (
           entries.map((entry) => {
-            const methodColor =
-              entry.method === 'mutation' ? theme.colors.accent.mutation : theme.colors.accent.query;
+            const methodColor = entry.method === 'mutation' ? theme.colors.accent.mutation : theme.colors.accent.query;
             const statusColor = entry.status === 'ok' ? theme.colors.accent.play : theme.colors.accent.danger;
             const isCurrent = entry.id === currentId;
             return (

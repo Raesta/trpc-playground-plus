@@ -114,7 +114,13 @@ describe('literalValues', () => {
   it('reads a direct const', () => expect(literalValues({ type: 'string', const: 'x' })).toEqual(['x']));
   it('reads a direct enum', () => expect(literalValues({ type: 'string', enum: ['a', 'b'] })).toEqual(['a', 'b']));
   it('flattens an anyOf of const literals (z.union of z.literal)', () => {
-    const schema = { anyOf: [{ type: 'string', const: 'sm' }, { type: 'string', const: 'md' }, { type: 'string', const: 'lg' }] };
+    const schema = {
+      anyOf: [
+        { type: 'string', const: 'sm' },
+        { type: 'string', const: 'md' },
+        { type: 'string', const: 'lg' },
+      ],
+    };
     expect(literalValues(schema)).toEqual(['sm', 'md', 'lg']);
   });
   it('flattens an anyOf mixing enum members', () => {

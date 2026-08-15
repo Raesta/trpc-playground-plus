@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type KeyLikeEvent, eventToKeyString, formatKeyString, hasActionModifier } from './keybinding';
+import { eventToKeyString, formatKeyString, hasActionModifier, type KeyLikeEvent } from './keybinding';
 
 const ev = (over: Partial<KeyLikeEvent> & { key: string }): KeyLikeEvent => ({
   ctrlKey: false,

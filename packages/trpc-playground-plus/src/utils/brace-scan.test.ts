@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import {
+  findCursorObjectContext,
+  findKeySpanAtPath,
+  findValueSpanAtPath,
+  scanBalanced,
+  splitTopLevel,
+} from './brace-scan';
 import { ARRAY_ITEMS } from './json-schema';
-import { findCursorObjectContext, findKeySpanAtPath, findValueSpanAtPath, scanBalanced, splitTopLevel } from './brace-scan';
 
 describe('splitTopLevel', () => {
   it('splits a flat list', () => {
@@ -190,7 +196,8 @@ describe('findKeySpanAtPath', () => {
   };
 
   it('locates a top-level key token', () => expect(at('trpc.a.mutate({ oops: 1 })', ['oops'])).toBe('oops'));
-  it('locates a nested key token', () => expect(at('trpc.a.mutate({ meta: { oops: 1 } })', ['meta', 'oops'])).toBe('oops'));
+  it('locates a nested key token', () =>
+    expect(at('trpc.a.mutate({ meta: { oops: 1 } })', ['meta', 'oops'])).toBe('oops'));
   it('locates a key inside an array element', () =>
     expect(at('trpc.a.mutate({ users: [{ name: "a" }, { oops: 1 }] })', ['users', '1', 'oops'])).toBe('oops'));
 });

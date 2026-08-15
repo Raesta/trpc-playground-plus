@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../ThemeContext';
 import type { Header, Variable, VariableType } from '../types';
-import { validateVariableValue } from '../utils/variable-validation';
 import { getStorageKey } from '../utils/storage-keys';
+import { validateVariableValue } from '../utils/variable-validation';
 import Checkbox from './ui/Checkbox';
 import Input from './ui/Input';
 
