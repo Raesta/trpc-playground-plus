@@ -1,0 +1,5 @@
+#!/bin/sh
+# Lint only the staged files with Biome before committing.
+# Biome's --staged flag relies on vcs.enabled in biome.json.
+# Uses pnpm exec so the biome binary resolves outside a pnpm-script context.
+pnpm exec biome check --staged --no-errors-on-unmatched
