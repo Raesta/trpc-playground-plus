@@ -74,6 +74,17 @@ export interface CallInfo {
   status: 'ok' | 'error';
 }
 
+/** A recorded request in the history journal (extends the inline CallInfo with I/O). */
+export interface HistoryEntry extends CallInfo {
+  id: string;
+  /** Unix ms of execution. */
+  timestamp: number;
+  /** The executed tRPC call source (the input). */
+  code: string;
+  /** The JSON-stringified response (or error text) shown in the viewer (the output). */
+  response: string;
+}
+
 export type ThemeMode = 'dark' | 'light';
 
 /** User-configurable keyboard shortcuts (CodeMirror key syntax, e.g. "Mod-Enter"). */
@@ -90,4 +101,6 @@ export interface PlaygroundSettings {
   theme: ThemeMode;
   requestTimeout: number;
   keybindings: KeyBindings;
+  /** Maximum number of requests kept in the history journal. */
+  historySize: number;
 }

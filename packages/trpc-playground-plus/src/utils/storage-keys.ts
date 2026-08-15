@@ -4,6 +4,7 @@ const BASE_KEYS = {
   variables: 'trpc-playground-variables',
   settings: 'trpc-playground-settings',
   drawerSections: 'trpc-playground-drawer-sections',
+  history: 'trpc-playground-history',
 } as const;
 
 export type StorageKeyName = keyof typeof BASE_KEYS;

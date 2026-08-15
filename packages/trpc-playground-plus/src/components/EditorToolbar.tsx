@@ -11,6 +11,9 @@ interface EditorToolbarProps {
   onFormat?: () => void;
   /** Show a "copy to clipboard" button that copies the editor's full content. */
   showCopy?: boolean;
+  /** Show a clock button that toggles the request-history panel. */
+  onHistoryClick?: () => void;
+  historyCount?: number;
   leftContent?: React.ReactNode;
   children?: React.ReactNode;
 }
@@ -87,6 +90,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   tabDrawerErrors,
   onFormat,
   showCopy,
+  onHistoryClick,
+  historyCount,
   leftContent,
   children,
 }) => {
@@ -225,6 +230,27 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onHistoryClick && (
+          <ToolbarButton title="Request history" onClick={onHistoryClick} variant="pill">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 3v5h5" />
+              <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+              <path d="M12 7v5l4 2" />
+            </svg>
+            {historyCount ? (
+              <span style={{ fontSize: theme.font.size.xs, fontWeight: 600 }}>{historyCount}</span>
+            ) : null}
+          </ToolbarButton>
+        )}
         {showCopy && (
           <ToolbarButton title={copied ? 'Copied!' : 'Copy to clipboard'} onClick={handleCopy} variant="pill">
             {copied ? (

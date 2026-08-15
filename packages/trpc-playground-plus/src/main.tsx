@@ -12,6 +12,7 @@ import { getTheme } from './theme';
 import {
   type CallInfo,
   type Header,
+  type HistoryEntry,
   type PlaygroundSettings,
   Scope,
   type Tab,
@@ -19,6 +20,7 @@ import {
   type VariableType,
 } from './types';
 import { getDrawerErrors } from './utils/drawer-errors';
+import { addHistoryEntry, loadHistory, saveHistory } from './utils/history';
 import { eventToKeyString } from './utils/keybinding';
 import { findTrpcCalls, pickCallAtCursor } from './utils/run-keymap';
 import { getStorageKey } from './utils/storage-keys';
@@ -129,6 +131,8 @@ const Playground = () => {
   const [fontSize, setFontSize] = useState(() => loadSettings().fontSize);
   const [requestTimeout, setRequestTimeout] = useState(() => loadSettings().requestTimeout);
   const [keybindings, setKeybindings] = useState(() => loadSettings().keybindings);
+  const [historySize, setHistorySize] = useState(() => loadSettings().historySize);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleSplitChange = useCallback(
@@ -149,6 +153,9 @@ const Playground = () => {
       }
       if (partial.keybindings !== undefined) {
         setKeybindings((prev) => ({ ...prev, ...partial.keybindings }));
+      }
+      if (partial.historySize !== undefined) {
+        setHistorySize(partial.historySize);
       }
       saveSettings(partial, config?.projectKey);
     },
@@ -226,6 +233,20 @@ const Playground = () => {
     setSplitPosition(s.splitPosition);
     setFontSize(s.fontSize);
     setRequestTimeout(s.requestTimeout);
+    setHistorySize(s.historySize);
+    const saved = loadHistory(config.projectKey);
+    setHistory(saved);
+    // Restore the last response + call info so a reload doesn't wipe the viewer.
+    if (saved.length > 0) {
+      const last = saved[0];
+      setResult(last.response);
+      setLastCall({
+        procedure: last.procedure,
+        method: last.method,
+        durationMs: last.durationMs,
+        status: last.status,
+      });
+    }
   }, [config]);
 
   const activeTab = tabs.find((tab) => tab.isActive);
@@ -298,6 +319,27 @@ const Playground = () => {
     setExecutingRange(range ?? null);
     const meta = parseCallMetadata(specificCode);
     const startTime = performance.now();
+
+    // Record the call in the history journal (newest first, capped by the setting).
+    const record = (response: string, status: 'ok' | 'error') => {
+      if (!meta) return;
+      const entry: HistoryEntry = {
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        code: specificCode,
+        response,
+        procedure: meta.procedure,
+        method: meta.method,
+        durationMs: Math.round(performance.now() - startTime),
+        status,
+      };
+      setHistory((h) => {
+        const next = addHistoryEntry(h, entry, historySize);
+        saveHistory(next, config.projectKey);
+        return next;
+      });
+    };
+
     const headersObject = getHeadersObject();
     const trpcClient = createDynamicTRPCClient({
       trpcUrl: config.trpcEndpoint,
@@ -348,7 +390,8 @@ const Playground = () => {
             ])
           : await resultPromise;
 
-      setResult(JSON.stringify(result, null, 2));
+      const response = JSON.stringify(result, null, 2);
+      setResult(response);
       if (meta) {
         setLastCall({
           procedure: meta.procedure,
@@ -357,8 +400,10 @@ const Playground = () => {
           status: 'ok',
         });
       }
+      record(response, 'ok');
     } catch (error) {
-      setResult(`Erreur: ${error instanceof Error ? error.message : String(error)}`);
+      const response = `Erreur: ${error instanceof Error ? error.message : String(error)}`;
+      setResult(response);
       if (meta) {
         setLastCall({
           procedure: meta.procedure,
@@ -367,6 +412,7 @@ const Playground = () => {
           status: 'error',
         });
       }
+      record(response, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -489,7 +535,7 @@ const Playground = () => {
       <Settings
         open={settingsOpen}
         setOpen={setSettingsOpen}
-        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout, keybindings }}
+        settings={{ splitPosition, fontSize, theme: loadSettings(config?.projectKey).theme, requestTimeout, keybindings, historySize }}
         onSettingsChange={handleSettingsChange}
       />
       <div style={{ padding: 10, fontFamily: theme.font.sans }}>
@@ -580,6 +626,12 @@ const Playground = () => {
             fontSize={fontSize}
             runShortcut={keybindings.run}
             searchShortcut={keybindings.search}
+            history={history}
+            onReplay={(code) => executeSpecificCode(code)}
+            onClearHistory={() => {
+              setHistory([]);
+              saveHistory([], config.projectKey);
+            }}
           />
         </div>
       </div>

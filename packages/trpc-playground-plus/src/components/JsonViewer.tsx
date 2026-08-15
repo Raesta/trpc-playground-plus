@@ -2,12 +2,14 @@ import { json } from '@codemirror/lang-json';
 import { search } from '@codemirror/search';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import type React from 'react';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createEditorTheme, getCodeMirrorTheme } from '../editorTheme';
 import { createSearchKeymap, createSearchTheme } from '../searchTheme';
 import { useTheme } from '../ThemeContext';
-import type { CallInfo } from '../types';
+import type { CallInfo, HistoryEntry } from '../types';
 import { EditorToolbar } from './EditorToolbar';
+import { HistoryModal } from './HistoryModal';
+import { HistoryPanel } from './HistoryPanel';
 
 interface JsonViewerProps {
   value: string;
@@ -16,6 +18,9 @@ interface JsonViewerProps {
   callInfo?: CallInfo | null;
   fontSize?: number;
   searchShortcut?: string;
+  history?: HistoryEntry[];
+  onReplay?: (code: string) => void;
+  onClearHistory?: () => void;
 }
 
 const spinnerKeyframes = `
@@ -84,9 +89,16 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   callInfo,
   fontSize = 15,
   searchShortcut,
+  history,
+  onReplay,
+  onClearHistory,
 }) => {
   const theme = useTheme();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [modal, setModal] = useState<{ mode: 'view' | 'compare'; entry: HistoryEntry } | null>(null);
+  const entries = history ?? [];
+  const current = entries[0] ?? null;
   const editorTheme = useMemo(() => createEditorTheme(fontSize, theme), [fontSize, theme]);
   const cmTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
   const searchTheme = useMemo(() => createSearchTheme(theme), [theme]);
@@ -127,11 +139,47 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
 
   return (
     <div style={styles.container}>
-      <EditorToolbar
-        editorRef={editorRef}
-        showCopy
-        leftContent={callInfo ? <CallInfoInline info={callInfo} /> : null}
-      />
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <EditorToolbar
+          editorRef={editorRef}
+          showCopy
+          onHistoryClick={onReplay ? () => setHistoryOpen((o) => !o) : undefined}
+          historyCount={entries.length}
+          leftContent={callInfo ? <CallInfoInline info={callInfo} /> : null}
+        />
+        {historyOpen && (
+          <HistoryPanel
+            entries={entries}
+            currentId={current?.id}
+            onView={(entry) => {
+              setModal({ mode: 'view', entry });
+              setHistoryOpen(false);
+            }}
+            onReplay={(entry) => {
+              onReplay?.(entry.code);
+              setHistoryOpen(false);
+            }}
+            onCompare={(entry) => {
+              setModal({ mode: 'compare', entry });
+              setHistoryOpen(false);
+            }}
+            onClear={() => {
+              onClearHistory?.();
+              setHistoryOpen(false);
+            }}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
+      </div>
+      {modal && (
+        <HistoryModal
+          mode={modal.mode}
+          entry={modal.entry}
+          current={current}
+          fontSize={fontSize}
+          onClose={() => setModal(null)}
+        />
+      )}
       {isLoading && (
         <div style={styles.loadingOverlay}>
           <Spinner />

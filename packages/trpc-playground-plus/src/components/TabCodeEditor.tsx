@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../ThemeContext';
-import type { CallInfo, RouterSchema, Tab, Variable } from '../types';
+import type { CallInfo, HistoryEntry, RouterSchema, Tab, Variable } from '../types';
 import { CodeEditor } from './CodeEditor';
 import { JsonViewer } from './JsonViewer';
 import { Tabs } from './Tabs';
@@ -26,6 +26,9 @@ interface TabCodeEditorProps {
   fontSize?: number;
   runShortcut?: string;
   searchShortcut?: string;
+  history?: HistoryEntry[];
+  onReplay?: (code: string) => void;
+  onClearHistory?: () => void;
 }
 
 const DIVIDER_HIT = 16;
@@ -49,6 +52,9 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
   fontSize,
   runShortcut,
   searchShortcut,
+  history,
+  onReplay,
+  onClearHistory,
 }) => {
   const theme = useTheme();
 
@@ -309,6 +315,9 @@ export const TabCodeEditor: React.FC<TabCodeEditorProps> = ({
             callInfo={callInfo}
             fontSize={fontSize}
             searchShortcut={searchShortcut}
+            history={history}
+            onReplay={onReplay}
+            onClearHistory={onClearHistory}
           />
         </div>
       </div>

@@ -1,4 +1,5 @@
 import type { PlaygroundSettings } from './types';
+import { DEFAULT_HISTORY_SIZE } from './utils/history';
 import { DEFAULT_RUN_KEY, DEFAULT_SEARCH_KEY } from './utils/keybinding';
 import { getStorageKey } from './utils/storage-keys';
 
@@ -8,6 +9,7 @@ const DEFAULTS: PlaygroundSettings = {
   theme: 'dark',
   requestTimeout: 0,
   keybindings: { run: DEFAULT_RUN_KEY, search: DEFAULT_SEARCH_KEY },
+  historySize: DEFAULT_HISTORY_SIZE,
 };
 
 export function loadSettings(projectKey?: string): PlaygroundSettings {

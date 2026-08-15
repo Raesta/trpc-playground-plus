@@ -16,6 +16,9 @@ interface SettingsProps {
 const FONT_SIZE_MIN = 10;
 const FONT_SIZE_MAX = 24;
 
+const HISTORY_SIZE_MIN = 1;
+const HISTORY_SIZE_MAX = 50;
+
 const TIMEOUT_OPTIONS = [
   { label: 'No limit', value: 0 },
   { label: '5s', value: 5000 },
@@ -206,6 +209,21 @@ const Settings = ({ open, setOpen, settings, onSettingsChange }: SettingsProps) 
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div style={settingRowStyle}>
+              <label style={labelStyle}>History size</label>
+              <input
+                type="number"
+                min={HISTORY_SIZE_MIN}
+                max={HISTORY_SIZE_MAX}
+                value={settings.historySize}
+                onChange={(e) => {
+                  const n = Math.min(HISTORY_SIZE_MAX, Math.max(HISTORY_SIZE_MIN, Number(e.target.value) || HISTORY_SIZE_MIN));
+                  onSettingsChange({ historySize: n });
+                }}
+                style={selectStyle}
+              />
             </div>
 
             {/* Shortcuts */}
