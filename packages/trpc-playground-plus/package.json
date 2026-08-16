@@ -1,6 +1,6 @@
 {
   "name": "trpc-playground-plus",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0",
   "description": "Universal tRPC playground for any server (Fastify, etc.)",
   "type": "module",
   "exports": {

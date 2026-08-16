@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and follows [Conventional Commits](https://www.conventionalcommits.org/).
 
+## [1.0.0](https://github.com/raesta/trpc-playground-plus/compare/v1.0.0-beta.2...v1.0.0) (2026-08-16)
+
+
+### Features
+
+* add autocomplete array ([910563c](https://github.com/raesta/trpc-playground-plus/commit/910563c35a8a9542aa6eedc0d6884f5e0f0a804e))
+* add basic keybindings system ([14ee08d](https://github.com/raesta/trpc-playground-plus/commit/14ee08d9ecf41004c01a895fdc9e70a59a233682))
+* add collapsed state of headers/variables in localStorage ([b01ea99](https://github.com/raesta/trpc-playground-plus/commit/b01ea9996ea8e85810c533a0e88829d3794aebed))
+* add copy/past button to json viewer ([1352266](https://github.com/raesta/trpc-playground-plus/commit/1352266db0fbed9e301af9fced2cdccf30d9a22c))
+* add requests history with actions (view, rerun & compare) ([4d683c4](https://github.com/raesta/trpc-playground-plus/commit/4d683c4de6703ce1a2cb467d52b52c2d07d83279))
+* add zod schema constrains ([07f9c4a](https://github.com/raesta/trpc-playground-plus/commit/07f9c4a3482e8c5314f2d0f0ec9b47be39ced3ec))
+
+
+### Bug Fixes
+
+* add array schema parsing ([4923ff2](https://github.com/raesta/trpc-playground-plus/commit/4923ff2946d9fa4d91f62bdd42f4d087f40ebb6f))
+* add autocomplete full literals ([866dabc](https://github.com/raesta/trpc-playground-plus/commit/866dabc5a354697806621cdd0dab706988795ecc))
+* add recursive object parsing to type checking ([7c26a7f](https://github.com/raesta/trpc-playground-plus/commit/7c26a7f13a3598ae4c27a4da99bddd4fa8f975b8))
+* apply correct design for typecheck popover ([447376d](https://github.com/raesta/trpc-playground-plus/commit/447376d4a99b54b6dbc0e909ebf9754dba5c66ad))
+* linter changes ([4e2dfca](https://github.com/raesta/trpc-playground-plus/commit/4e2dfcac86a3bad4ab971531e542b0a2c62deac1))
+* remove regex to locator offset ([f4f9749](https://github.com/raesta/trpc-playground-plus/commit/f4f974910ddcfe33b93282794d469d30131f0a19))
+* use correctly email rule ([e6a0938](https://github.com/raesta/trpc-playground-plus/commit/e6a09383c3e7da7a8e77a1c0e1ece82abae26fb6))
+
+
+### Refactor
+
+* share code to parsing schema for typechecking, autocomplete et validation ([4de4596](https://github.com/raesta/trpc-playground-plus/commit/4de459681bf378db5d86aa32173a0d6268fa4417))
+
 ## [1.0.0-beta.2](https://github.com/raesta/trpc-playground-plus/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-07-21)
 
 
