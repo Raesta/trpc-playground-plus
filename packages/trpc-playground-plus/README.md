@@ -14,17 +14,20 @@
 - 🔄 **Default data loading** for new users (Tabs, Headers, etc.)
 - 🔧 **HTTP headers customization** (global & per-tab)
 - 🧬 **Variables support** with type validation (global & per-tab)
+- 🌱 **Environment variables injection** (read-only, provided by the server)
+- 🕑 **Request history** — replay, view, and diff (input & output) past calls side-by-side
+- ✨ **Smart autocomplete & inline linting** based on your tRPC schema — deep support for nested objects, arrays, discriminated unions, and schema constraints (min/max, patterns, formats…)
+- ⌨️ **Configurable keyboard shortcuts** (run & search)
 - 🎨 **Light & dark themes**
-- ⚙️ **Customizable settings** (font size, timeout, split)
-- ✨ **Smart autocomplete & inline linting** based on your tRPC schema
+- ⚙️ **Customizable settings** (font size, timeout, split, history size, shortcuts)
 - 🪄 **Built-in code formatter**
 - 🏢 **Monorepo-friendly** (isolate data per project)
 - 🔌 **Adapters** for Fastify
 
 ## 🛠️ Coming Soon
 
-- 🌈 **Support for more frameworks** (Express, Koa, etc.)
-- 🧩 **More configuration options** to customize your experience
+- 🌈 **Support for more frameworks** (Express, Koa, Next.js, Hono…)
+- 📡 **Subscriptions** support (WebSocket)
 - ...and much more!
 
 Feel free to suggest ideas or contribute on [GitHub](https://github.com/raesta/trpc-playground-plus) !
@@ -32,15 +35,17 @@ Feel free to suggest ideas or contribute on [GitHub](https://github.com/raesta/t
 
 ## 📦 Installation
 
+It's a dev tool, so install it as a dev dependency:
+
 ```bash
 # npm
-npm install trpc-playground-plus
+npm install --save-dev trpc-playground-plus
 
 # yarn
-yarn add trpc-playground-plus
+yarn add --dev trpc-playground-plus
 
 # pnpm
-pnpm add trpc-playground-plus
+pnpm add --save-dev trpc-playground-plus
 ```
 
 ## 🚀 Quick Start
@@ -114,6 +119,7 @@ await createFastifyAdapter({
 | `playgroundEndpoint` | `string` | Playground path | `/playground` |
 | `transformer` | `'superjson'` | Data transformer used by your tRPC client | `undefined` |
 | `defaultData` | `ExportData` | Default tabs/headers to bootstrap the playground | `undefined` |
+| `envVariables` | `Record<string, unknown>` | Read-only variables injected by the server, usable in queries by their key (like any variable) | `undefined` |
 | `projectKey` | `string` | Prefix for localStorage keys (monorepo isolation) | `undefined` |
 
 ## 🏢 Monorepo Support
@@ -146,7 +152,7 @@ Compatible with tRPC v11+ and zod 4.
 
 ## ❓ Why this project?
 
-During a project, we encountered limitations with the `trpc-playground` solution, which is no longer maintained. This is a proof of concept (POC) created to address the specific needs we had, while providing a modern and maintainable alternative for exploring and testing tRPC APIs easily.
+During a project, we encountered limitations with the `trpc-playground` solution, which is no longer maintained. It started as a proof of concept (POC) to address the specific needs we had — but it has since grown well beyond that into a real, actively maintained alternative for exploring and testing tRPC APIs, with a modern UI, smart autocomplete & linting, request history, environment variables, and an extensible multi-adapter architecture.
 
 ## 📄 License
 
