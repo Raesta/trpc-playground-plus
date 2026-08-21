@@ -1,11 +1,11 @@
 import { initTRPC } from '@trpc/server';
-import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
-import fastify from 'fastify';
-import { createFastifyAdapter } from 'trpc-playground-plus/adapters/fastify';
+import { createExpressMiddleware } from '@trpc/server/adapters/express';
+import express from 'express';
+import { createExpressAdapter } from 'trpc-playground-plus/adapters/express';
 import { z } from 'zod';
 import trpcPlaygroundTabs from './trpc-playground-tabs.json';
 
-const app = fastify();
+const app = express();
 const t = initTRPC.create();
 
 // Create a nested router for users
@@ -104,7 +104,7 @@ const appRouter = t.router({
         }),
       }),
     )
-    .output(z.object({}))
+    .output(z.object({ message: z.string() }))
     .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
 
   testSubArray: t.procedure
@@ -116,7 +116,7 @@ const appRouter = t.router({
         }),
       }),
     )
-    .output(z.object({}))
+    .output(z.object({ message: z.string() }))
     .query(({ input }) => ({ message: `Hello, ${JSON.stringify(input, null, 2)}!` })),
 
   setStatus: t.procedure
@@ -187,20 +187,20 @@ const appRouter = t.router({
   arrays: arrayRouter,
 });
 
-app.register(fastifyTRPCPlugin, {
-  prefix: '/trpc',
-  trpcOptions: {
+app.use(
+  '/trpc',
+  createExpressMiddleware({
     router: appRouter,
-  },
-});
+  }),
+);
 
-const playground = await createFastifyAdapter({
+createExpressAdapter({
   app,
   trpcEndpoint: '/trpc',
   router: appRouter,
   playgroundEndpoint: '/playground',
   defaultData: trpcPlaygroundTabs,
-  projectKey: 'funnel-api',
+  projectKey: 'express-demo',
   envVariables: {
     API_URL: process.env.API_URL ?? 'https://api.example.com',
     TENANT_ID: process.env.TENANT_ID ?? 'tenant-default',
@@ -208,6 +208,6 @@ const playground = await createFastifyAdapter({
   },
 });
 
-playground.listen({ port: 4000 }, () => {
-  console.log('🚀 Playground running at http://localhost:4000/playground');
+app.listen(4001, () => {
+  console.log('🚀 Playground running at http://localhost:4001/playground');
 });

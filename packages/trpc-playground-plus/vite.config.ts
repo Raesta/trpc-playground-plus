@@ -14,6 +14,7 @@ export default defineConfig({
       // resolve `./app` relative to its own bundle. Add new adapters here.
       entry: {
         fastify: resolve(import.meta.dirname, 'src/adapters/fastify.ts'),
+        express: resolve(import.meta.dirname, 'src/adapters/express.ts'),
       },
       name: 'TRPCPlaygroundPlus',
       // CJS must use a real `.cjs` extension: the package is `type: module`, so a `.js`
@@ -31,6 +32,7 @@ export default defineConfig({
         'node:fs',
         'node:url',
         '@fastify/static',
+        'express',
       ],
       onwarn(warning, defaultHandler) {
         // The adapter uses `import.meta.url` (valid in the ESM bundle). In the CJS bundle

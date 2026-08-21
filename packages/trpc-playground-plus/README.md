@@ -22,11 +22,11 @@
 - ⚙️ **Customizable settings** (font size, timeout, split, history size, shortcuts)
 - 🪄 **Built-in code formatter**
 - 🏢 **Monorepo-friendly** (isolate data per project)
-- 🔌 **Adapters** for Fastify
+- 🔌 **Adapters** for Fastify and Express
 
 ## 🛠️ Coming Soon
 
-- 🌈 **Support for more frameworks** (Express, Koa, Next.js, Hono…)
+- 🌈 **Support for more frameworks** (Koa, Next.js, Hono…)
 - 📡 **Subscriptions** support (WebSocket)
 - ...and much more!
 
@@ -75,6 +75,35 @@ pnpm add --save-dev trpc-playground-plus
   ```
 </details>
 
+<details>
+  <summary>With Express</summary>
+
+  ```typescript
+  import { createExpressAdapter } from 'trpc-playground-plus/adapters/express';
+  import express from 'express';
+  import { appRouter } from './router';
+
+  const app = express();
+
+  // Playground configuration
+  createExpressAdapter({
+    app,
+    trpcEndpoint: 'http://localhost:3000/api/trpc',
+    router: appRouter,
+    playgroundEndpoint: '/playground'
+  });
+
+  // Start server
+  app.listen(3000, () => {
+    console.log('🚀 Server available at http://localhost:3000');
+    console.log('🚀 Playground available at http://localhost:3000/playground');
+  });
+  ```
+
+  Works with Express 4 and 5. Static assets are served with the built-in `express.static`,
+  so there is nothing else to install.
+</details>
+
 ## 📋 Loading Default Queries
 
 ### Method: Configuration via an object or Json file
@@ -113,7 +142,7 @@ await createFastifyAdapter({
 
 | Option | Type | Description | Default |
 |--------|------|-------------|------------|
-| `app` | `FastifyInstance` | Fastify instance | (required) |
+| `app` | `FastifyInstance` \| `Express` | Server instance the playground is mounted on | (required) |
 | `trpcEndpoint` | `string` | tRPC API Endpoint | (required) |
 | `router` | `Router` | tRPC Router | (required) |
 | `playgroundEndpoint` | `string` | Playground path | `/playground` |
@@ -128,7 +157,7 @@ If you use **trpc-playground-plus** in multiple projects served on the same doma
 
 ```typescript
 // App A
-await createFastifyAdapter({
+await createAdapter({
   app,
   trpcEndpoint: '/api/trpc',
   router: appRouter,
@@ -136,7 +165,7 @@ await createFastifyAdapter({
 });
 
 // App B (different project in same monorepo)
-await createFastifyAdapter({
+await createAdapter({
   app,
   trpcEndpoint: '/api/trpc',
   router: appRouter,
@@ -149,6 +178,14 @@ localStorage keys are then prefixed (e.g. `app-a:trpc-playground-tabs`), avoidin
 ## 🔧 Compatibility
 
 Compatible with tRPC v11+ and zod 4.
+
+Adapters are exposed as separate entry points, so only the framework you import is pulled in.
+The matching framework package is an **optional peer dependency** — install it in your own app:
+
+| Adapter | Entry point | Peer dependencies |
+|---------|-------------|-------------------|
+| Fastify | `trpc-playground-plus/adapters/fastify` | `fastify` ^5, `@fastify/static` ^8 |
+| Express | `trpc-playground-plus/adapters/express` | `express` ^4.18 \|\| ^5 |
 
 ## ❓ Why this project?
 
