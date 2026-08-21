@@ -1,0 +1,29 @@
+{
+  "tabs": [
+    {
+      "id": "tab-express-hello",
+      "title": "Hello",
+      "content": "trpc.hello.query({ name: \"world\" })",
+      "isActive": true
+    },
+    {
+      "id": "tab-express-nested",
+      "title": "Nested router",
+      "content": "trpc.user.getById.query(\"42\")",
+      "isActive": false
+    },
+    {
+      "id": "tab-express-arrays",
+      "title": "Arrays",
+      "content": "trpc.arrays.users.mutate({ users: [{ name: \"a\" }, { name: 42 }] })",
+      "isActive": false
+    }
+  ],
+  "headers": [
+    {
+      "key": "x-tenant",
+      "value": "{{TENANT_ID}}",
+      "enabled": false
+    }
+  ]
+}
